@@ -19,6 +19,8 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   }
 
   handleRequest(err: any, user: any, info: any, context: ExecutionContext) {
+    console.log(context);
+    
     if (err) {
       this.logger.error(`Ошибка авторизации: ${err.message}`, err.stack);
     }

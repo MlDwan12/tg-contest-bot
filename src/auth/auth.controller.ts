@@ -17,12 +17,17 @@ export class AuthController {
 
   @Post('login')
   async login(
-    @Body() body: { email: string; password: string },
+    @Body() body: { userName: string; password: string },
     @Res({ passthrough: true }) res: Response,
   ) {
-    this.logger.log(`Попытка входа: ${body.email}`);
+    console.log('BODY====>', body);
 
-    const user = await this.authService.validateUser(body.email, body.password);
+    this.logger.log(`Попытка входа: ${body.userName}`);
+
+    const user = await this.authService.validateUser(
+      body.userName,
+      body.password,
+    );
 
     if (!user) {
       this.logger.warn(`Неуспешная авторизация: ${user}`);
@@ -36,15 +41,15 @@ export class AuthController {
 
     res.cookie('refresh_token', refreshToken, {
       httpOnly: true,
-      secure: true,
-      sameSite: 'strict',
+      secure: false,
+      sameSite: 'none',
       maxAge: 1000 * 60 * 60 * 24 * 7, // 7 дней
     });
 
     res.cookie('access_token', accessToken, {
       httpOnly: true,
-      secure: true,
-      sameSite: 'strict',
+      secure: false,
+      sameSite: 'none',
       maxAge: 1000 * 60 * 60 * 24, // 1 день
     });
 
