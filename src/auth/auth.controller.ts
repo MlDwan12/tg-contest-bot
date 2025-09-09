@@ -44,7 +44,6 @@ export class AuthController {
       secure: true,
       sameSite: 'none',
       maxAge: 1000 * 60 * 60 * 24 * 7, // 7 дней
-      domain: 'rollcube.ru',
       path: '/',
     });
 
@@ -53,7 +52,6 @@ export class AuthController {
       secure: true,
       sameSite: 'none',
       maxAge: 1000 * 60 * 60 * 24, // 1 день
-      domain: 'rollcube.ru',
       path: '/',
     });
 
