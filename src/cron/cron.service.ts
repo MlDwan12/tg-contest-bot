@@ -1,0 +1,237 @@
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
+import { SchedulerRegistry, Cron, CronExpression } from '@nestjs/schedule';
+import { Repository } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
+import {
+  ScheduledTask,
+  ScheduledTaskStatus,
+  ScheduledTaskType,
+} from './entities/cron.entity';
+import { CronJob } from 'cron';
+import { ContestService } from 'src/contest/contest.service';
+import { TelegramService } from 'src/telegram/telegram.service';
+import { ContestParticipationService } from 'src/contest-participation/contest-participation.service';
+import { Telegraf } from 'telegraf';
+import { InjectBot } from 'nestjs-telegraf';
+
+@Injectable()
+export class CronService {
+  private readonly logger = new Logger(CronService.name);
+
+  constructor(
+    private readonly schedulerRegistry: SchedulerRegistry,
+    @InjectRepository(ScheduledTask)
+    private readonly scheduledTaskRepo: Repository<ScheduledTask>,
+    @Inject(forwardRef(() => ContestService))
+    private contestService: ContestService,
+    private _telegramService: TelegramService,
+    private _contestParticipationService: ContestParticipationService,
+    @InjectBot() private readonly bot: Telegraf<any>,
+  ) {}
+
+  async createTaskInDb(task: {
+    type: ScheduledTaskType;
+    referenceId: number;
+    runAt: Date;
+    payload?: Record<string, any>;
+  }): Promise<ScheduledTask> {
+    const scheduledTask = this.scheduledTaskRepo.create({
+      type: task.type,
+      referenceId: task.referenceId,
+      runAt: task.runAt,
+      status: ScheduledTaskStatus.PENDING,
+      payload: task.payload,
+    });
+    this.logger.log(
+      `Создана новая задача в БД: ${task.type}-${task.referenceId}`,
+    );
+    return this.scheduledTaskRepo.save(scheduledTask);
+  }
+
+  @Cron(CronExpression.EVERY_10_SECONDS)
+  async scanTasksAndSchedule() {
+    const today = new Date();
+    const tasks = await this.scheduledTaskRepo.find({
+      where: { status: ScheduledTaskStatus.PENDING },
+    });
+    this.logger.log(`Сканирование задач: найдено ${tasks.length} задач`);
+
+    for (const task of tasks) {
+      const jobName = `${task.type}-${task.referenceId}`;
+      let exists = false;
+      try {
+        exists = !!this.schedulerRegistry.getCronJob(jobName);
+      } catch {
+        exists = false;
+      }
+
+      if (exists) {
+        this.logger.log(`Задача ${jobName} уже запланирована, пропускаем`);
+        continue;
+      }
+
+      const runAt = new Date(task.runAt);
+      if (runAt >= today) {
+        this.logger.log(`Запланирована задача ${jobName} на ${runAt}`);
+        this.scheduleTask(task);
+      }
+    }
+  }
+
+  scheduleTask(task: any) {
+    const cronExpression = this.convertDateToCron(new Date(task.runAt));
+    this.logger.log(
+      `Создание CronJob для задачи ${task.type}-${task.referenceId}`,
+    );
+    const ctx = this.bot;
+
+    const job = new CronJob(cronExpression, async () => {
+      this.logger.log(
+        `Выполнение задачи: ${task.type} для referenceId: ${task.referenceId}`,
+      );
+      const contest = await this.contestService.getContestById(
+        task.referenceId,
+      );
+
+      if (!contest) {
+        this.logger.error(`Конкурс ${task.referenceId} не найден`);
+        return;
+      }
+
+      try {
+        const oldTask = await this.scheduledTaskRepo.findOne({
+          where: {
+            type: task.type,
+            referenceId: task.referenceId,
+            status: ScheduledTaskStatus.PENDING,
+          },
+        });
+
+        if (oldTask)
+          this.schedulerRegistry.deleteCronJob(
+            `${oldTask.type}-${oldTask.referenceId}`,
+          );
+
+        const channels = contest.allowedGroups;
+        const telegramMessageIds: string[] = [];
+
+        if (task.type === ScheduledTaskType.POST_PUBLISH) {
+          await Promise.all(
+            channels.map(async (channel) => {
+              const telegramMessageId = await this._telegramService.sendPosts(
+                channel.telegramId,
+                contest.description,
+                contest.imageUrl,
+                contest.id,
+                channel.telegramId,
+                contest.buttonText,
+              );
+              const messageIdStr = `${telegramMessageId[0].chatId}:${telegramMessageId[0].messageId}`;
+              telegramMessageIds.push(messageIdStr);
+              this.logger.log(
+                `Конкурс ${contest.id} отправлен в канал ${channel.telegramId}`,
+              );
+            }),
+          );
+
+          if (contest.status === 'pending') {
+            contest.telegramMessageIds = telegramMessageIds;
+            contest.status = 'active';
+            await this.contestService.saveContest(contest);
+            this.logger.log(`Конкурс ${contest.id} активирован`);
+          }
+        } else if (task.type === ScheduledTaskType.CONTEST_FINISH) {
+          contest.status = 'completed';
+          await this.contestService.saveContest(contest);
+          this.logger.log(`Конкурс ${contest.id} завершен`);
+
+          const winners = await this.contestService.getWinners(contest.id);
+
+          await Promise.all(
+            winners.map(async (winner) => {
+              const group = channels.find(
+                (c) => c.telegramId === winner.groupId.toString(),
+              );
+              if (!group) {
+                this.logger.warn(`Группа с id ${winner.groupId} не найдена`);
+                return;
+              }
+
+              const messageIds = (contest.telegramMessageIds ?? [])
+                .filter((msgId): msgId is string => msgId !== null)
+                .map((msgId) =>
+                  this.getValueByGroupId(msgId, group.telegramId),
+                );
+
+              for (const msgId of contest.telegramMessageIds ?? []) {
+                if (msgId) {
+                  await this._telegramService.editPost(
+                    msgId.split(':')[0],
+                    Number(msgId.split(':')[1]),
+                    contest.id,
+                  );
+                }
+              }
+
+              return this._telegramService.sendPrivateMessage(
+                winner.user.telegramId,
+                'Поздравляю, вы победили в конкурсе 🎉',
+                group.telegramName,
+                messageIds[0]!,
+              );
+            }),
+          );
+        }
+
+        if (oldTask) await this.scheduledTaskRepo.delete(oldTask.id);
+      } catch (err) {
+        this.logger.error(
+          `Ошибка выполнения задачи ${task.type}-${task.referenceId}`,
+          err.stack,
+        );
+      }
+    });
+
+    this.schedulerRegistry.addCronJob(`${task.type}-${task.referenceId}`, job);
+    job.start();
+    this.logger.log(
+      `CronJob ${task.type}-${task.referenceId} успешно добавлен и запущен`,
+    );
+  }
+
+  private convertDateToCron(date: Date): string {
+    return `${date.getSeconds()} ${date.getMinutes()} ${date.getHours()} ${date.getDate()} ${date.getMonth() + 1} *`;
+  }
+
+  private getValueByGroupId(input: string, groupId: string): string | null {
+    const cleaned = input.replace(/^\[|\]$/g, '');
+    const pairs = cleaned.split(',');
+    for (const pair of pairs) {
+      const [key, value] = pair.split(':');
+      if (key === groupId) return value;
+    }
+    return null;
+  }
+
+  async findTaskByRef(type: ScheduledTaskType, referenceId: number) {
+    this.logger.log(`Поиск задачи: ${type}-${referenceId}`);
+    return this.scheduledTaskRepo.findOne({
+      where: { type, referenceId, status: ScheduledTaskStatus.PENDING },
+    });
+  }
+
+  async deleteTaskFromDb(id: number | string) {
+    this.logger.log(`Удаление задачи из БД, id=${id}`);
+    return this.scheduledTaskRepo.delete(id);
+  }
+
+  removeScheduledJob(task: ScheduledTask) {
+    const jobName = `${task.type}-${task.referenceId}`;
+    try {
+      this.schedulerRegistry.deleteCronJob(jobName);
+      this.logger.log(`Удалён CronJob ${jobName}`);
+    } catch {
+      this.logger.warn(`CronJob ${jobName} не найден для удаления`);
+    }
+  }
+}
