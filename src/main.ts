@@ -36,6 +36,7 @@ async function bootstrap() {
       'https://d68dv7gb-3000.euw.devtunnels.ms/',
     ],
     credentials: true,
+    exposedHeaders: ['set-cookie'],
   });
 
   await app.listen(process.env.PORT ?? 3000);
