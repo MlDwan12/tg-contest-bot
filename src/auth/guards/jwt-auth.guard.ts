@@ -7,6 +7,9 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
   canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest();
+    console.log('РЕКВЕСТ====>', request);
+
+    console.log('КУКИ====>', request.cookies);
 
     this.logger.debug(
       `Попытка доступа: ${request.method} ${request.url} | IP=${request.ip}`,

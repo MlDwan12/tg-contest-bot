@@ -48,7 +48,7 @@ export class CronService {
     return this.scheduledTaskRepo.save(scheduledTask);
   }
 
-  @Cron(CronExpression.EVERY_10_SECONDS)
+  @Cron(CronExpression.EVERY_MINUTE)
   async scanTasksAndSchedule() {
     const today = new Date();
     const tasks = await this.scheduledTaskRepo.find({

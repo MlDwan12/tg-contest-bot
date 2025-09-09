@@ -35,9 +35,10 @@ export class AuthService {
   }
 
   async generateTokens(user: Admin) {
+    this.logger.debug(`Генерация токенов для user=${user}`);
     this.logger.debug(`Генерация токенов для userId=${user.id}`);
 
-    const payload = { sub: user.id, useName: user.userName, role: 'admin' };
+    const payload = { sub: user.id, userName: user.userName, role: 'admin' };
 
     const accessToken = await this.jwtService.signAsync(payload, {
       secret: process.env.JWT_ACCESS_SECRET,

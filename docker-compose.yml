@@ -9,7 +9,7 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgres://postgres:password@db:5432/contestdb
-      NODE_ENV: production
+      NODE_ENV: development
     volumes:
       - .:/usr/src/app
       - /usr/src/app/node_modules
