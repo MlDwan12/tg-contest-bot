@@ -40,7 +40,7 @@ export class AuthController {
     console.log('======>', accessToken, refreshToken);
 
     res.cookie('refresh_token', refreshToken, {
-      httpOnly: false,
+      httpOnly: true,
       secure: true,
       sameSite: 'strict',
       maxAge: 1000 * 60 * 60 * 24 * 7, // 7 дней
@@ -48,7 +48,7 @@ export class AuthController {
     });
 
     res.cookie('access_token', accessToken, {
-      httpOnly: false,
+      httpOnly: true,
       secure: true,
       sameSite: 'strict',
       maxAge: 1000 * 60 * 60 * 24, // 1 день
