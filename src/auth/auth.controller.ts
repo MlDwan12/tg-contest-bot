@@ -44,6 +44,8 @@ export class AuthController {
       secure: true,
       sameSite: 'none',
       maxAge: 1000 * 60 * 60 * 24 * 7, // 7 дней
+      domain: 'rollcube.ru',
+      path: '/',
     });
 
     res.cookie('access_token', accessToken, {
@@ -51,6 +53,8 @@ export class AuthController {
       secure: true,
       sameSite: 'none',
       maxAge: 1000 * 60 * 60 * 24, // 1 день
+      domain: 'rollcube.ru',
+      path: '/',
     });
 
     this.logger.log(`Успешный вход: ${user.userName}`);
