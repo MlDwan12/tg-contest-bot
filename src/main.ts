@@ -31,7 +31,7 @@ async function bootstrap() {
 
   app.enableCors({
     origin: [
-      'www.rollcube.ru',
+      'https://www.rollcube.ru',
       'http://localhost:8945',
       'https://rollcube.ru',
       'https://d68dv7gb-3000.euw.devtunnels.ms/',
