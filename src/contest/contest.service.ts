@@ -224,7 +224,7 @@ export class ContestService {
           winner.user = await this._userService.findOrCreate({
             telegramId: Number(userId),
           });
-          winner.contest = contest;
+          // winner.contest = contest;
           return winner;
         }),
       );
