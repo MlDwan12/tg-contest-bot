@@ -202,7 +202,7 @@ export class ContestService {
     );
 
     // Если нужно обновить посты в телеграме
-    if (dto.description || dto.buttonText) {
+    if (dto.description || dto.buttonText || dto.name) {
       for (const msgId of contest.telegramMessageIds ?? []) {
         if (!msgId) continue;
 
@@ -216,6 +216,16 @@ export class ContestService {
         );
       }
     }
+
+    if (dto.winners) {
+      contest.winners = dto.winners.split(',').map((userId) => {
+        const winner = new ContestWinner();
+        winner.user = { id: userId } as any;
+        winner.contest = contest;
+        return winner;
+      });
+    }
+    this.logger.log(`Добавлены победители ${contest.winners}`);
 
     const updated = await this.contestRepo.save(contest);
 

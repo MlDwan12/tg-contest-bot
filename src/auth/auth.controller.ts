@@ -68,7 +68,7 @@ export class AuthController {
 
     this.logger.log(`Успешный вход: ${user.userName}`);
 
-    return { message: 'Login successful' };
+    return { name: user.userName, id: user.id };
   }
 
   @Post('logout')
