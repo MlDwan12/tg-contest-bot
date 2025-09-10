@@ -265,13 +265,18 @@ export class ContestService {
       this.logger.error(`Конкурс id=${constestId} не найден`);
       throw new HttpException('конкурс не найден', HttpStatus.NOT_FOUND);
     }
+    let winners: number[] = [];
+
+    if (contest.winners.length) {
+      winners = contest.winners.map((e) => e.user.id);
+    }
 
     const randomElements = this.getRandomElement(
       contest.participants,
       contest.prizePlaces,
     );
     if (randomElements?.length) {
-      const winners = randomElements.map((e) => e.id);
+      winners = randomElements.map((e) => e.id);
       this.logger.log(
         `Победители выбраны для конкурса id=${constestId}: ${winners.join(',')}`,
       );
