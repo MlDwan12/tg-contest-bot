@@ -1,8 +1,12 @@
-import { Injectable, Logger, ExecutionContext, UnauthorizedException } from "@nestjs/common";
-import { AuthGuard } from "@nestjs/passport";
-import { AuthService } from "../auth.service";
+import {
+  Injectable,
+  Logger,
+  ExecutionContext,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { AuthService } from '../auth.service';
 import { ModuleRef } from '@nestjs/core';
-
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
@@ -24,9 +28,6 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     this.logger.debug(
       `Попытка доступа: ${request.method} ${request.url} | IP=${request.ip}`,
     );
-    this.logger.warn(`[REQ] =======>  ${request.cookies}`);
-    this.logger.warn(`[Access] =======>  ${request.cookies?.['access_token']}`);
-    this.logger.warn(`[refresh_token] =======>  ${request.cookies?.['refresh_token']}`);
     try {
       // стандартная JWT-проверка
       return (await super.canActivate(context)) as boolean;

@@ -212,6 +212,7 @@ export class ContestService {
           Number(messageId),
           contest,
           contest.description,
+          contest.imageUrl ?? undefined,
           contest.buttonText,
         );
       }

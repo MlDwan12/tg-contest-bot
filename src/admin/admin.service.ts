@@ -66,7 +66,7 @@ export class AdminService {
   async findAll() {
     try {
       this.logger.log(`Запрос списка администраторов`);
-      return await this.adminRepository.find();
+      return await this.adminRepository.find({ select: { password: false } });
     } catch (error: any) {
       this.logger.error(
         `Ошибка при получении списка администраторов`,
@@ -82,7 +82,10 @@ export class AdminService {
   async findOne(options: Partial<Admin>) {
     try {
       this.logger.log(`Поиск админа по параметрам: ${JSON.stringify(options)}`);
-      const admin = await this.adminRepository.findOne({ where: options });
+      const admin = await this.adminRepository.findOne({
+        where: options,
+        select: { password: false },
+      });
 
       if (!admin) {
         this.logger.warn(

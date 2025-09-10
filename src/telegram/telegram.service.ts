@@ -9,6 +9,11 @@ import {
 } from 'telegraf/typings/core/types/typegram';
 import { Channel } from 'src/channel/entities/channel.entity';
 import { Contest } from 'src/contest/entities/contest.entity';
+import path from 'path';
+// import path from 'path';
+
+type TextMessage = Message.TextMessage;
+type PhotoMessage = Message.PhotoMessage;
 
 @Injectable()
 export class TelegramService {
@@ -266,7 +271,6 @@ export class TelegramService {
   //   }
   // }
 
-
   // async editPost(
   //   channelId: string,
   //   messageId: number,
@@ -321,64 +325,161 @@ export class TelegramService {
   //   }
   // }
 
+  // async editPost(
+  //   channelId: string,
+  //   messageId: number,
+  //   contest: Contest,
+  //   newText?: string,
+  //   buttonText?: string,
+  // ) {
+  //   try {
+  //     this.logger.log(
+  //       `Редактирование поста ${messageId} в канале ${channelId}`,
+  //     );
+
+  //     const oldWebAppUrl = `https://t.me/my_test_contest_bot/apprandom?startapp=${channelId}_${contest.id}`;
+
+  //     const keyboard: InlineKeyboardMarkup = {
+  //       inline_keyboard: [[{ text: 'Конкурс окончен 🎲', url: oldWebAppUrl }]],
+  //     };
+
+  //     const oldButton = {
+  //       inline_keyboard: [
+  //         [{ text: buttonText ?? contest.buttonText, url: oldWebAppUrl }],
+  //       ],
+  //     };
+
+  //     if (newText) {
+  //       if (contest?.imageUrl) {
+  //         // Если точно знаешь, что это фото с caption → используй editMessageCaption
+  //         return (await this.bot.telegram.editMessageCaption(
+  //           Number(channelId),
+  //           messageId,
+  //           undefined,
+  //           newText,
+  //           {
+  //             parse_mode: 'HTML',
+  //             reply_markup: oldButton,
+  //           },
+  //         )) as Message.TextMessage | true | undefined;
+  //       } else {
+  //         // Попробуем сначала как текст
+  //         return (await this.bot.telegram.editMessageText(
+  //           Number(channelId),
+  //           messageId,
+  //           undefined,
+  //           newText,
+  //           {
+  //             parse_mode: 'HTML',
+  //             reply_markup: oldButton,
+  //           },
+  //         )) as Message.TextMessage | true | undefined;
+  //       }
+  //     }
+
+  //     return (await this.bot.telegram.editMessageReplyMarkup(
+  //       Number(channelId),
+  //       messageId,
+  //       undefined,
+  //       keyboard,
+  //     )) as Message.TextMessage | true | undefined;
+  //   } catch (err) {
+  //     this.logger.error(
+  //       `Ошибка при редактировании поста ${messageId} в канале ${channelId}: ${err.message}`,
+  //       err.stack,
+  //     );
+  //     throw new HttpException(
+  //       'Не удалось редактировать пост в канале',
+  //       HttpStatus.INTERNAL_SERVER_ERROR,
+  //     );
+  //   }
+  // }
+
   async editPost(
     channelId: string,
     messageId: number,
     contest: Contest,
     newText?: string,
+    newImageUrl?: string,
     buttonText?: string,
-  ) {
+  ): Promise<TextMessage | PhotoMessage | true | undefined> {
+    const webAppUrl = `https://t.me/my_test_contest_bot/apprandom?startapp=${channelId}_${contest.id}`;
+    const inlineKeyboard: InlineKeyboardMarkup = {
+      inline_keyboard: [
+        [
+          {
+            text: buttonText ?? contest.buttonText ?? 'Участвую! 🎉',
+            url: webAppUrl,
+          },
+        ],
+      ],
+    };
+
     try {
       this.logger.log(
         `Редактирование поста ${messageId} в канале ${channelId}`,
       );
+      console.log(newImageUrl);
 
-      const oldWebAppUrl = `https://t.me/my_test_contest_bot/apprandom?startapp=${channelId}_${contest.id}`;
+      let result: unknown;
 
-      const keyboard: InlineKeyboardMarkup = {
-        inline_keyboard: [[{ text: 'Конкурс окончен 🎲', url: oldWebAppUrl }]],
-      };
+      if (newImageUrl) {
+        this.logger.log(`Редактируем фото сообщения ${messageId}`);
+        const media: InputMediaPhoto = {
+          type: 'photo',
+          media: { source: createReadStream(`.${newImageUrl}`) }, // URL или file_id
+          caption: newText ?? contest.description,
+          parse_mode: 'HTML',
+        };
 
-      const oldButton = {
-        inline_keyboard: [
-          [{ text: buttonText ?? contest.buttonText, url: oldWebAppUrl }],
-        ],
-      };
+        await this.bot.telegram.editMessageMedia(
+          Number(channelId),
+          messageId,
+          undefined,
+          media,
+          { reply_markup: inlineKeyboard },
+        );
 
-      if (newText) {
-        if(contest?.imageUrl) {
-          // Если точно знаешь, что это фото с caption → используй editMessageCaption
-          return (await this.bot.telegram.editMessageCaption(
+        this.logger.log(`Фото сообщения ${messageId} обновлено`);
+      } else if (newText) {
+        // Если это фото с caption
+        if (contest?.imageUrl) {
+          this.logger.log(`Редактируем caption фото сообщения ${messageId}`);
+          result = await this.bot.telegram.editMessageCaption(
             Number(channelId),
             messageId,
             undefined,
             newText,
-            {
-              parse_mode: 'HTML',
-              reply_markup: oldButton,
-            },
-          )) as Message.TextMessage | true | undefined;
+            { parse_mode: 'HTML', reply_markup: inlineKeyboard },
+          );
         } else {
-          // Попробуем сначала как текст
-          return (await this.bot.telegram.editMessageText(
+          // Просто текстовое сообщение
+          this.logger.log(`Редактируем текст сообщения ${messageId}`);
+          result = await this.bot.telegram.editMessageText(
             Number(channelId),
             messageId,
             undefined,
             newText,
-            {
-              parse_mode: 'HTML',
-              reply_markup: oldButton,
-            },
-          )) as Message.TextMessage | true | undefined;
+            { parse_mode: 'HTML', reply_markup: inlineKeyboard },
+          );
         }
+        this.logger.log(`Текст сообщения ${messageId} обновлён`);
+      } else if (buttonText) {
+        // Только обновляем кнопки
+        this.logger.log(`Редактируем кнопки сообщения ${messageId}`);
+        result = await this.bot.telegram.editMessageReplyMarkup(
+          Number(channelId),
+          messageId,
+          undefined,
+          inlineKeyboard,
+        );
+        this.logger.log(`Кнопки сообщения ${messageId} обновлены`);
+      } else {
+        this.logger.log(`Нет изменений для сообщения ${messageId}`);
+        result = undefined;
       }
 
-      return (await this.bot.telegram.editMessageReplyMarkup(
-        Number(channelId),
-        messageId,
-        undefined,
-        keyboard,
-      )) as Message.TextMessage | true | undefined;
+      return result as TextMessage | PhotoMessage | true | undefined;
     } catch (err) {
       this.logger.error(
         `Ошибка при редактировании поста ${messageId} в канале ${channelId}: ${err.message}`,
@@ -390,7 +491,6 @@ export class TelegramService {
       );
     }
   }
-
 
   async isBotAdmin(channel: Channel): Promise<boolean> {
     try {

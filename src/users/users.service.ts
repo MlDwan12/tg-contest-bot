@@ -17,7 +17,10 @@ export class UsersService {
     const telegramId = String(tgUser.telegramId);
     this.logger.log(`Поиск пользователя с telegramId=${telegramId}`);
 
-    let user = await this.userRepo.findOne({ where: { telegramId } });
+    let user = await this.userRepo.findOne({
+      where: { telegramId },
+      select: ['id', 'telegramId', 'username'],
+    });
     if (user) {
       this.logger.log(
         `Пользователь найден: id=${user.id}, username=${user.username}`,
