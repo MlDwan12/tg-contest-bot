@@ -63,7 +63,7 @@ export class ContestParticipationService {
       );
       exists.status = status;
       await this.participationRepo.save(exists);
-      return { data: [] };
+      return [];
     }
 
     const participation = this.participationRepo.create({
@@ -76,7 +76,7 @@ export class ContestParticipationService {
     this.logger.log(
       `Участие пользователя ${user.id} создано с id=${participation.id}`,
     );
-    return { data: [] };
+    return [];
   }
 
   async updateWinner(ids: number[], contestId: number) {

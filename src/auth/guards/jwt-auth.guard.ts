@@ -1,42 +1,61 @@
-import {
-  Injectable,
-  ExecutionContext,
-  UnauthorizedException,
-  Logger,
-} from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
+import { Injectable, Logger, ExecutionContext, UnauthorizedException } from "@nestjs/common";
+import { AuthGuard } from "@nestjs/passport";
+import { AuthService } from "../auth.service";
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
   private readonly logger = new Logger(JwtAuthGuard.name);
 
+  constructor(private readonly authService: AuthService) {
+    super();
+  }
+
   async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest();
+    const response = context.switchToHttp().getResponse();
+
     this.logger.debug(
       `Попытка доступа: ${request.method} ${request.url} | IP=${request.ip}`,
     );
 
     try {
+      // стандартная JWT-проверка
       return (await super.canActivate(context)) as boolean;
-    } catch (err) {
+    } catch {
       this.logger.warn(`Access токен невалиден или истёк, пробуем refresh`);
+
       const refreshToken = request.cookies?.['refresh_token'];
       if (!refreshToken) throw new UnauthorizedException('Нет refresh токена');
 
-      // Вызываем сервис для валидации refresh токена
-      const user = await request.authService.validateRefreshToken(refreshToken);
-      if (!user) throw new UnauthorizedException('Невалидный refresh токен');
+      // обновляем токены
+      const tokens = await this.authService.refreshTokens(refreshToken);
+      if (!tokens) throw new UnauthorizedException('Невалидный refresh токен');
 
-      // Генерируем новый access token и кладём в куку
-      const tokens = await request.authService.generateTokens(user);
-      request.res.cookie('access_token', tokens.accessToken, {
+      // выставляем новые куки
+      response.cookie('access_token', tokens.accessToken, {
         httpOnly: true,
+        sameSite: 'strict',
+        secure: false, // true если https
+        maxAge: 1000 * 60 * 5,
       });
-      request.res.cookie('refresh_token', tokens.refreshToken, {
+      response.cookie('refresh_token', tokens.refreshToken, {
         httpOnly: true,
+        sameSite: 'strict',
+        secure: false,
+        maxAge: 1000 * 60 * 60 * 24 * 7,
       });
 
-      request.user = user;
+      // верифицируем новый access-токен и кладём пользователя в request
+      const payload = await this.authService.verifyAccessToken(
+        tokens.accessToken,
+      );
+
+      request.user = {
+        userId: payload.sub,
+        userName: payload.userName,
+        role: payload.role,
+      };
+
       return true;
     }
   }

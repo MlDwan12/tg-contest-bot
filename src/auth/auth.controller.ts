@@ -60,7 +60,8 @@ export class AuthController {
       httpOnly: true,
       secure: false,
       sameSite: 'strict',
-      maxAge: 1000 * 60 * 60 * 24, // 1 день
+      maxAge: 1000 * 60 * 5, // 1 день
+      // maxAge: 1000 * 60 * 60 * 24, // 1 день
       path: '/',
     });
     console.log(12331212);

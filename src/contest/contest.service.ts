@@ -186,27 +186,42 @@ export class ContestService {
 
   async updateContest(id: number, dto: UpdateContestDto): Promise<Contest> {
     this.logger.log(`Обновление конкурса id=${id}`);
+
     const contest = await this.contestRepo.findOne({ where: { id } });
     if (!contest) {
       this.logger.error(`Конкурс id=${id} не найден`);
       throw new NotFoundException('Contest not found');
     }
 
-    this.logger.log(`Конкурс id=${id} успешно обновлён`);
-    if (dto.description || dto.buttonText)
-      for (const msgId of contest.telegramMessageIds ?? []) {
-        if (msgId) {
-          await this._telegramPostService.editPost(
-            msgId.split(':')[0],
-            Number(msgId.split(':')[1]),
-            contest.id,
-            dto.description ?? contest.description,
-            dto.buttonText ?? contest.buttonText,
-          );
-        }
-      }
+    // Обновляем поля в объекте
+    Object.assign(contest, dto);
 
-    return this.contestRepo.save(contest);
+    // Логируем изменения
+    this.logger.debug(
+      `Поля для обновления: ${JSON.stringify(dto)} | Конкурс id=${id}`,
+    );
+
+    // Если нужно обновить посты в телеграме
+    if (dto.description || dto.buttonText) {
+      for (const msgId of contest.telegramMessageIds ?? []) {
+        if (!msgId) continue;
+
+        const [chatId, messageId] = msgId.split(':');
+        await this._telegramPostService.editPost(
+          chatId,
+          Number(messageId),
+          contest.id,
+          contest.description,
+          contest.buttonText,
+        );
+      }
+    }
+
+    const updated = await this.contestRepo.save(contest);
+
+    this.logger.log(`Конкурс id=${id} успешно обновлён`);
+
+    return updated;
   }
 
   async myContest(id: string, chatId: string) {

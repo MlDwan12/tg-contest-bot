@@ -78,4 +78,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
   }
+
+  async verifyAccessToken(token: string) {
+    return this.jwtService.verifyAsync(token, {
+      secret: process.env.JWT_ACCESS_SECRET!,
+    });
+  }
 }
