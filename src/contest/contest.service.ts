@@ -218,12 +218,16 @@ export class ContestService {
     }
 
     if (dto.winners) {
-      contest.winners = dto.winners.split(',').map((userId) => {
-        const winner = new ContestWinner();
-        winner.user = { id: userId } as any;
-        winner.contest = contest;
-        return winner;
-      });
+      contest.winners = await Promise.all(
+        dto.winners.split(',').map(async (userId) => {
+          const winner = new ContestWinner();
+          winner.user = await this._userService.findOrCreate({
+            telegramId: Number(userId),
+          });
+          winner.contest = contest;
+          return winner;
+        }),
+      );
     }
     this.logger.log(`Добавлены победители ${contest.winners}`);
 

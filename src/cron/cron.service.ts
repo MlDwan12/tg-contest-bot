@@ -131,13 +131,13 @@ export class CronService {
           await Promise.all(
             channels.map(async (channel) => {
               const telegramMessageId = await this._telegramService.sendPosts(
-                channel.telegramId,
+                channel.telegramId, // ID канала
                 contest.description,
                 contest.imageUrl,
                 contest.id,
-                channel.telegramId,
-                contest.buttonText,
+                contest.buttonText, // убрал лишний channel.telegramId
               );
+
               const messageIdStr = `${telegramMessageId[0].chatId}:${telegramMessageId[0].messageId}`;
               telegramMessageIds.push(messageIdStr);
               this.logger.log(
