@@ -12,7 +12,6 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { UsersService } from 'src/users/users.service';
 import { ContestService } from 'src/contest/contest.service';
 
-@UseGuards(JwtAuthGuard)
 @Controller('contest-participation')
 export class ContestParticipationController {
   private readonly logger = new Logger(ContestParticipationController.name);

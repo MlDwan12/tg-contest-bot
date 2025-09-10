@@ -116,6 +116,8 @@ export class ContestService {
         HttpStatus.NOT_FOUND,
       );
     }
+    this.logger.log('dto.StartDate', dto.startDate);
+    this.logger.log('dto.StartDate', new Date(dto.startDate!));
 
     const contest = this.contestRepo.create({
       name: dto.name,
@@ -190,8 +192,20 @@ export class ContestService {
       throw new NotFoundException('Contest not found');
     }
 
-    // здесь у тебя будет логика обновления...
     this.logger.log(`Конкурс id=${id} успешно обновлён`);
+    if (dto.description || dto.buttonText)
+      for (const msgId of contest.telegramMessageIds ?? []) {
+        if (msgId) {
+          await this._telegramPostService.editPost(
+            msgId.split(':')[0],
+            Number(msgId.split(':')[1]),
+            contest.id,
+            dto.description ?? contest.description,
+            dto.buttonText ?? contest.buttonText,
+          );
+        }
+      }
+
     return this.contestRepo.save(contest);
   }
 
@@ -226,17 +240,18 @@ export class ContestService {
       contest.participants,
       contest.prizePlaces,
     );
-    if (!randomElements?.length) {
-      this.logger.warn(`Нет участников для конкурса id=${constestId}`);
-      throw new HttpException('Нет участников', HttpStatus.CONFLICT);
+    if (randomElements?.length) {
+      const winners = randomElements.map((e) => e.id);
+      this.logger.log(
+        `Победители выбраны для конкурса id=${constestId}: ${winners.join(',')}`,
+      );
+
+      return this._contestParticipationService.updateWinner(
+        winners,
+        constestId,
+      );
     }
-
-    const winners = randomElements.map((e) => e.id);
-    this.logger.log(
-      `Победители выбраны для конкурса id=${constestId}: ${winners.join(',')}`,
-    );
-
-    return this._contestParticipationService.updateWinner(winners, constestId);
+    return [];
   }
 
   async removeContest(id: number) {

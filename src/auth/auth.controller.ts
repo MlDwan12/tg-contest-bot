@@ -5,15 +5,24 @@ import {
   Res,
   UnauthorizedException,
   Logger,
+  Get,
+  UseGuards,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { ChannelController } from 'src/channel/channel.controller';
 import { Response } from 'express';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
   private readonly logger = new Logger(ChannelController.name);
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  checkAuth() {
+    return { authenticated: true };
+  }
 
   @Post('login')
   async login(

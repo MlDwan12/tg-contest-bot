@@ -1,4 +1,11 @@
-import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
+import {
+  forwardRef,
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { SchedulerRegistry, Cron, CronExpression } from '@nestjs/schedule';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -50,7 +57,7 @@ export class CronService {
 
   @Cron(CronExpression.EVERY_MINUTE)
   async scanTasksAndSchedule() {
-    const today = new Date();
+    const now = new Date();
     const tasks = await this.scheduledTaskRepo.find({
       where: { status: ScheduledTaskStatus.PENDING },
     });
@@ -71,7 +78,12 @@ export class CronService {
       }
 
       const runAt = new Date(task.runAt);
-      if (runAt >= today) {
+      if (runAt <= now) {
+        // просрочено — запускаем немедленно
+        this.logger.log(`Просроченная задача ${jobName}, запускаем немедленно`);
+        await this.executeTask(task); // нужно, чтобы у тебя был метод выполнить задачу сразу
+      } else {
+        // запланировано на будущее
         this.logger.log(`Запланирована задача ${jobName} на ${runAt}`);
         this.scheduleTask(task);
       }
@@ -146,6 +158,22 @@ export class CronService {
           this.logger.log(`Конкурс ${contest.id} завершен`);
 
           const winners = await this.contestService.getWinners(contest.id);
+
+          if (!winners.length) {
+            for (const msgId of contest.telegramMessageIds ?? []) {
+              if (msgId) {
+                await this._telegramService.editPost(
+                  msgId.split(':')[0],
+                  Number(msgId.split(':')[1]),
+                  contest.id,
+                );
+              }
+            }
+            throw new HttpException(
+              'Конкурс отменен. Нет участников',
+              HttpStatus.CONFLICT,
+            );
+          }
 
           await Promise.all(
             winners.map(async (winner) => {
@@ -232,6 +260,67 @@ export class CronService {
       this.logger.log(`Удалён CronJob ${jobName}`);
     } catch {
       this.logger.warn(`CronJob ${jobName} не найден для удаления`);
+    }
+  }
+
+  private async executeTask(task: ScheduledTask) {
+    this.logger.log(
+      `Немедленное выполнение задачи: ${task.type}-${task.referenceId}`,
+    );
+
+    const contest = await this.contestService.getContestById(task.referenceId);
+    if (!contest) {
+      this.logger.error(`Конкурс ${task.referenceId} не найден`);
+      return;
+    }
+
+    try {
+      if (task.type === ScheduledTaskType.POST_PUBLISH) {
+        const channels = contest.allowedGroups;
+        const telegramMessageIds: string[] = [];
+
+        await Promise.all(
+          channels.map(async (channel) => {
+            const telegramMessageId = await this._telegramService.sendPosts(
+              channel.telegramId,
+              contest.description,
+              contest.imageUrl,
+              contest.id,
+              channel.telegramId,
+              contest.buttonText,
+            );
+            const messageIdStr = `${telegramMessageId[0].chatId}:${telegramMessageId[0].messageId}`;
+            telegramMessageIds.push(messageIdStr);
+            this.logger.log(
+              `Конкурс ${contest.id} отправлен в канал ${channel.telegramId}`,
+            );
+          }),
+        );
+
+        if (contest.status === 'pending') {
+          contest.telegramMessageIds = telegramMessageIds;
+          contest.status = 'active';
+          await this.contestService.saveContest(contest);
+          this.logger.log(`Конкурс ${contest.id} активирован`);
+        }
+      }
+
+      if (task.type === ScheduledTaskType.CONTEST_FINISH) {
+        contest.status = 'completed';
+        await this.contestService.saveContest(contest);
+        this.logger.log(`Конкурс ${contest.id} завершен`);
+      }
+
+      // обновляем статус задачи
+      task.status = ScheduledTaskStatus.COMPLETED;
+      await this.scheduledTaskRepo.save(task);
+    } catch (err) {
+      this.logger.error(
+        `Ошибка при выполнении задачи ${task.type}-${task.referenceId}`,
+        err.stack,
+      );
+      task.status = ScheduledTaskStatus.FAILED;
+      await this.scheduledTaskRepo.save(task);
     }
   }
 }

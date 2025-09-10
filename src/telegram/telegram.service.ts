@@ -192,11 +192,11 @@ export class TelegramService {
       this.logger.log(
         `Редактирование поста ${messageId} в канале ${channelId}`,
       );
-      const webAppUrl = `https://t.me/my_test_contest_bot/apprandom?startapp=finished${contestId}`;
+      // const webAppUrl = `https://t.me/my_test_contest_bot/apprandom?startapp=finished${contestId}`;
       const oldWebAppUrl = `https://t.me/my_test_contest_bot/apprandom?startapp=${channelId}_${contestId}`;
 
       const keyboard: InlineKeyboardMarkup = {
-        inline_keyboard: [[{ text: 'Конкурс окончен 🎲', url: webAppUrl }]],
+        inline_keyboard: [[{ text: 'Конкурс окончен 🎲', url: oldWebAppUrl }]],
       };
       const oldButton = {
         inline_keyboard: [
@@ -230,6 +230,38 @@ export class TelegramService {
       );
       throw new HttpException(
         'Не удалось редактировать пост в канале',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async isBotAdmin(channel: Channel): Promise<boolean> {
+    try {
+      // Получаем информацию о самом боте
+      const botInfo = await this.bot.telegram.getMe();
+
+      // Проверяем статус бота в указанном чате
+      const member = await this.bot.telegram.getChatMember(
+        channel.telegramId,
+        botInfo.id,
+      );
+
+      const isAdmin = ['administrator', 'creator'].includes(member.status);
+
+      this.logger.log(
+        `Бот ${botInfo.username} является ${
+          isAdmin ? '' : 'не '
+        }админом в чате ${channel.telegramName}`,
+      );
+
+      return isAdmin;
+    } catch (err) {
+      this.logger.error(
+        `Ошибка при проверке прав бота в канале ${channel.telegramName}: ${err.message}`,
+        err.stack,
+      );
+      throw new HttpException(
+        'Не удалось проверить права бота в канале',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

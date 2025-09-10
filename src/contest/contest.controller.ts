@@ -41,7 +41,7 @@ export class ContestController {
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard)
   @UseInterceptors(
     FileInterceptor('image', {
       storage: diskStorage({

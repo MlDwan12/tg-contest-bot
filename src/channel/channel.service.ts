@@ -35,6 +35,26 @@ export class ChannelService {
         );
       }
 
+      const chatInfo = await this._telegramService.getChatInfo(
+        createChannelDto.telegramName,
+      );
+
+      const tempChannel = this.channelRepository.create({
+        telegramId: String(chatInfo.id),
+        telegramName: 'username' in chatInfo ? chatInfo.username! : undefined,
+      });
+
+      const isBotAdmin = await this._telegramService.isBotAdmin(tempChannel);
+      if (!isBotAdmin) {
+        this.logger.warn(
+          `Бот не является админом в канале ${createChannelDto.telegramName}`,
+        );
+        throw new HttpException(
+          'Бот должен быть администратором канала для его добавления',
+          HttpStatus.FORBIDDEN,
+        );
+      }
+
       const chat = await this._telegramService.getChatInfo(
         createChannelDto.telegramName,
       );
