@@ -131,13 +131,13 @@ export class CronService {
           await Promise.all(
             channels.map(async (channel) => {
               const telegramMessageId = await this._telegramService.sendPosts(
-                channel.telegramId, // ID канала
+                channel.telegramId,
                 contest.description,
                 contest.imageUrl,
                 contest.id,
-                contest.buttonText, // убрал лишний channel.telegramId
+                channel.telegramId,
+                contest.buttonText,
               );
-
               const messageIdStr = `${telegramMessageId[0].chatId}:${telegramMessageId[0].messageId}`;
               telegramMessageIds.push(messageIdStr);
               this.logger.log(
@@ -263,64 +263,5 @@ export class CronService {
     }
   }
 
-  private async executeTask(task: ScheduledTask) {
-    this.logger.log(
-      `Немедленное выполнение задачи: ${task.type}-${task.referenceId}`,
-    );
-
-    const contest = await this.contestService.getContestById(task.referenceId);
-    if (!contest) {
-      this.logger.error(`Конкурс ${task.referenceId} не найден`);
-      return;
-    }
-
-    try {
-      if (task.type === ScheduledTaskType.POST_PUBLISH) {
-        const channels = contest.allowedGroups;
-        const telegramMessageIds: string[] = [];
-
-        await Promise.all(
-          channels.map(async (channel) => {
-            const telegramMessageId = await this._telegramService.sendPosts(
-              channel.telegramId,
-              contest.description,
-              contest.imageUrl,
-              contest.id,
-              channel.telegramId,
-              contest.buttonText,
-            );
-            const messageIdStr = `${telegramMessageId[0].chatId}:${telegramMessageId[0].messageId}`;
-            telegramMessageIds.push(messageIdStr);
-            this.logger.log(
-              `Конкурс ${contest.id} отправлен в канал ${channel.telegramId}`,
-            );
-          }),
-        );
-
-        if (contest.status === 'pending') {
-          contest.telegramMessageIds = telegramMessageIds;
-          contest.status = 'active';
-          await this.contestService.saveContest(contest);
-          this.logger.log(`Конкурс ${contest.id} активирован`);
-        }
-      }
-
-      if (task.type === ScheduledTaskType.CONTEST_FINISH) {
-        contest.status = 'completed';
-        await this.contestService.saveContest(contest);
-        this.logger.log(`Конкурс ${contest.id} завершен`);
-      }
-
-      // обновляем статус задачи
-      task.status = ScheduledTaskStatus.COMPLETED;
-      await this.scheduledTaskRepo.save(task);
-    } catch (err) {
-      this.logger.error(
-        `Ошибка при выполнении задачи ${task.type}-${task.referenceId}`,
-        err.stack,
-      );
-      task.status = ScheduledTaskStatus.FAILED;
-      await this.scheduledTaskRepo.save(task);
-    }
-  }
+  
 }
