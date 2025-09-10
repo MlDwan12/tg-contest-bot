@@ -210,7 +210,7 @@ export class ContestService {
         await this._telegramPostService.editPost(
           chatId,
           Number(messageId),
-          contest.id,
+          contest,
           contest.description,
           contest.buttonText,
         );

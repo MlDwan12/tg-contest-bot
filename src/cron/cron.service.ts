@@ -165,7 +165,7 @@ export class CronService {
                 await this._telegramService.editPost(
                   msgId.split(':')[0],
                   Number(msgId.split(':')[1]),
-                  contest.id,
+                  contest,
                 );
               }
             }
@@ -196,7 +196,7 @@ export class CronService {
                   await this._telegramService.editPost(
                     msgId.split(':')[0],
                     Number(msgId.split(':')[1]),
-                    contest.id,
+                    contest,
                   );
                 }
               }

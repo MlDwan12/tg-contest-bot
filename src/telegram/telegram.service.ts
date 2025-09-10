@@ -4,9 +4,11 @@ import { InjectBot } from 'nestjs-telegraf';
 import { createReadStream } from 'fs';
 import {
   InlineKeyboardMarkup,
+  InputMediaPhoto,
   Message,
 } from 'telegraf/typings/core/types/typegram';
 import { Channel } from 'src/channel/entities/channel.entity';
+import { Contest } from 'src/contest/entities/contest.entity';
 
 @Injectable()
 export class TelegramService {
@@ -184,7 +186,7 @@ export class TelegramService {
   async editPost(
     channelId: string,
     messageId: number,
-    contestId: number,
+    contest: Contest,
     newText?: string,
     newImageUrl?: string,
     buttonText?: string,
@@ -193,35 +195,36 @@ export class TelegramService {
       this.logger.log(
         `Редактирование поста ${messageId} в канале ${channelId}`,
       );
-
-      const webAppUrl = `https://t.me/my_test_contest_bot/apprandom?startapp=${channelId}_${contestId}`;
+      const webAppUrl = `https://t.me/my_test_contest_bot/apprandom?startapp=${channelId}_${contest.id}`;
       const inlineKeyboard: InlineKeyboardMarkup = {
         inline_keyboard: [
-          [{ text: buttonText ?? 'Участвовать', url: webAppUrl }],
+          [{ text: buttonText ?? contest.buttonText, url: webAppUrl }],
         ],
       };
 
+      // Если меняется картинка или есть текст, используем editMessageMedia
       if (newImageUrl) {
-        this.logger.log(`Удаляем старое сообщение ${messageId}`);
-        await this.bot.telegram.deleteMessage(Number(channelId), messageId);
+        this.logger.log(`Редактируем фото сообщения ${messageId}`);
+        const media: InputMediaPhoto = {
+          type: 'photo',
+          media: newImageUrl, // URL или File ID
+          caption: newText ?? contest.description,
+          parse_mode: 'HTML',
+        };
 
-        this.logger.log(`Отправляем новое фото в канал ${channelId}`);
-        const sentMessage = await this.bot.telegram.sendPhoto(
+        const edited = await this.bot.telegram.editMessageMedia(
           Number(channelId),
-          newImageUrl,
-          {
-            caption: newText ?? '',
-            parse_mode: 'HTML',
-            reply_markup: inlineKeyboard,
-          },
+          messageId,
+          undefined,
+          media,
+          { reply_markup: inlineKeyboard },
         );
 
-        this.logger.log(
-          `Новое сообщение отправлено, messageId=${sentMessage.message_id}`,
-        );
-        return sentMessage; // PhotoMessage
+        this.logger.log(`Фото сообщения ${messageId} обновлено`);
+        return edited as unknown as Message.PhotoMessage | true;
       }
 
+      // Если только текст или кнопка
       if (newText) {
         this.logger.log(`Редактируем текст сообщения ${messageId}`);
         const edited = await this.bot.telegram.editMessageCaption(
@@ -229,28 +232,25 @@ export class TelegramService {
           messageId,
           undefined,
           newText,
-          {
-            parse_mode: 'HTML',
-            reply_markup: inlineKeyboard,
-          },
+          { parse_mode: 'HTML', reply_markup: inlineKeyboard },
         );
 
         this.logger.log(`Текст сообщения ${messageId} обновлён`);
-        return edited as unknown as true | Message.TextMessage | undefined;
+        return edited as unknown as Message.TextMessage | true | undefined;
       }
 
-      if (buttonText) {
-        this.logger.log(`Редактируем кнопки сообщения ${messageId}`);
-        const edited = await this.bot.telegram.editMessageReplyMarkup(
-          Number(channelId),
-          messageId,
-          undefined,
-          inlineKeyboard,
-        );
+      // if (buttonText) {
+      //   this.logger.log(`Редактируем кнопки сообщения ${messageId}`);
+      //   const edited = await this.bot.telegram.editMessageReplyMarkup(
+      //     Number(channelId),
+      //     messageId,
+      //     undefined,
+      //     inlineKeyboard,
+      //   );
 
-        this.logger.log(`Кнопки сообщения ${messageId} обновлены`);
-        return edited as unknown as true | Message.TextMessage | undefined;
-      }
+      //   this.logger.log(`Кнопки сообщения ${messageId} обновлены`);
+      //   return edited as unknown as Message.TextMessage | true | undefined;
+      // }
 
       this.logger.log(`Нет изменений для сообщения ${messageId}`);
       return undefined;
