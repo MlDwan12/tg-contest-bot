@@ -45,6 +45,11 @@ export class ChannelController {
         `Ошибка при создании канала: ${error.message}`,
         error.stack,
       );
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
       throw new HttpException(
         'Ошибка при создании канала',
         HttpStatus.INTERNAL_SERVER_ERROR,

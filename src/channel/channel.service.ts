@@ -29,6 +29,7 @@ export class ChannelService {
         this.logger.warn(
           `Канал уже существует: ${createChannelDto.telegramName}`,
         );
+
         throw new HttpException(
           'Данный канал или группа уже существует',
           HttpStatus.CONFLICT,
@@ -75,9 +76,14 @@ export class ChannelService {
         `Ошибка при создании канала: ${error.message}`,
         error.stack,
       );
+
+      if (error instanceof HttpException) {
+        throw error; // пробрасываем оригинал
+      }
+
       throw new HttpException(
         'Ошибка при создании канала',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
