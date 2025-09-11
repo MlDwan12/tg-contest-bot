@@ -166,6 +166,9 @@ export class CronService {
                   msgId.split(':')[0],
                   Number(msgId.split(':')[1]),
                   contest,
+                  undefined,
+                  undefined,
+                  'Конкурс завершен',
                 );
               }
             }

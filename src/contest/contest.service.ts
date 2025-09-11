@@ -258,7 +258,7 @@ export class ContestService {
     this.logger.log(`Запуск выбора победителей для конкурса id=${constestId}`);
     const contest = await this.contestRepo.findOne({
       where: { id: constestId },
-      relations: { participants: { user: true } },
+      relations: { participants: { user: true }, winners: { user: true } },
     });
 
     if (!contest) {
@@ -267,15 +267,17 @@ export class ContestService {
     }
     let winners: number[] = [];
 
-    if (contest.winners.length) {
+    if (contest.winners?.length) {
       winners = contest.winners.map((e) => e.user.id);
     }
+    console.log(123, contest.winners);
+    console.log(1234, contest.participants);
 
-    const randomElements = this.getRandomElement(
-      contest.participants,
-      contest.prizePlaces,
-    );
-    if (randomElements?.length) {
+    if (contest.participants && !contest.winners) {
+      const randomElements = this.getRandomElement(
+        contest.participants,
+        contest.prizePlaces,
+      );
       winners = randomElements.map((e) => e.id);
       this.logger.log(
         `Победители выбраны для конкурса id=${constestId}: ${winners.join(',')}`,
@@ -349,7 +351,7 @@ export class ContestService {
     return telegramMessageIds;
   }
 
-  private getRandomElement<T>(arr: T[], count: number): T[] | null {
+  private getRandomElement<T>(arr: T[], count: number): T[] {
     this.logger.log(`Выбор случайных элементов (${count}) из массива`);
     if (!arr || arr.length === 0 || count <= 0) return [];
     const result: T[] = [];
