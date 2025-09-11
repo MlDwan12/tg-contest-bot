@@ -202,7 +202,7 @@ export class ContestService {
     );
 
     // Если нужно обновить посты в телеграме
-    if (dto.description || dto.buttonText || dto.name) {
+    if (dto.description || dto.buttonText || dto.name || dto.imageUrl) {
       for (const msgId of contest.telegramMessageIds ?? []) {
         if (!msgId) continue;
 
@@ -258,7 +258,10 @@ export class ContestService {
     this.logger.log(`Запуск выбора победителей для конкурса id=${constestId}`);
     const contest = await this.contestRepo.findOne({
       where: { id: constestId },
-      relations: { participants: { user: true }, winners: { user: true } },
+      relations: {
+        participants: { user: true },
+        winners: { user: { participations: { contest: true } } },
+      },
     });
 
     if (!contest) {
@@ -268,12 +271,18 @@ export class ContestService {
     let winners: number[] = [];
 
     if (contest.winners?.length) {
-      winners = contest.winners.map((e) => e.user.id);
+      winners = contest.winners.flatMap((e) => {
+        return e.user.participations
+          .map((p) => {
+            console.log(p);
+            if (p.contest.id === constestId) return p.id;
+          })
+          .filter((p) => p !== undefined);
+      });
     }
-    console.log(123, contest.winners);
-    console.log(1234, contest.participants);
+    console.log(123, winners);
 
-    if (contest.participants && !contest.winners) {
+    if (contest.participants && !contest.winners.length) {
       const randomElements = this.getRandomElement(
         contest.participants,
         contest.prizePlaces,
@@ -282,13 +291,9 @@ export class ContestService {
       this.logger.log(
         `Победители выбраны для конкурса id=${constestId}: ${winners.join(',')}`,
       );
-
-      return this._contestParticipationService.updateWinner(
-        winners,
-        constestId,
-      );
     }
-    return [];
+
+    return this._contestParticipationService.updateWinner(winners, constestId);
   }
 
   async removeContest(id: number) {

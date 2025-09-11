@@ -133,6 +133,7 @@ export class TelegramService {
           chat.telegramId,
           telegramId,
         );
+
         const subscribed = ['member', 'administrator', 'creator'].includes(
           member.status,
         );
