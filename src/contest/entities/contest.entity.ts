@@ -31,7 +31,7 @@ export class Contest {
   // @OneToMany(() => ContestWinner, (w) => w.contest)
   // winners: ContestWinner[];
 
-  @OneToMany(() => ContestWinner, (w) => w.contest, { cascade: true })
+  @OneToMany(() => ContestWinner, (w) => w.contest)
   winners: ContestWinner[];
 
   @OneToMany(() => ContestParticipation, (p) => p.contest)

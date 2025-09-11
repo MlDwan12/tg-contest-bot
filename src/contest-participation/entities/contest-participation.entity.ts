@@ -10,7 +10,7 @@ export class ContestParticipation {
   @ManyToOne(() => User, (u) => u.participations)
   user: User;
 
-  @ManyToOne(() => Contest, (c) => c.participants)
+  @ManyToOne(() => Contest, (c) => c.participants, { onDelete: 'CASCADE' })
   contest: Contest;
 
   @Column({ default: 'verified' })

@@ -400,6 +400,7 @@ export class TelegramService {
     channelId: string,
     messageId: number,
     contest: Contest,
+    newName?: string,
     newText?: string,
     newImageUrl?: string,
     buttonText?: string,
@@ -450,7 +451,7 @@ export class TelegramService {
             Number(channelId),
             messageId,
             undefined,
-            newText,
+            `${contest.name}/n/n${newText}`,
             { parse_mode: 'HTML', reply_markup: inlineKeyboard },
           );
         } else {
@@ -460,19 +461,44 @@ export class TelegramService {
             Number(channelId),
             messageId,
             undefined,
-            newText,
+            `${contest.name}/n/n${newText}`,
             { parse_mode: 'HTML', reply_markup: inlineKeyboard },
           );
         }
         this.logger.log(`Текст сообщения ${messageId} обновлён`);
+      }
+      if (newName) {
+        if (contest?.imageUrl) {
+          this.logger.log(`Редактируем caption фото сообщения ${messageId}`);
+          result = await this.bot.telegram.editMessageCaption(
+            Number(channelId),
+            messageId,
+            undefined,
+            `${newName}/n/n${contest?.description}`,
+            { parse_mode: 'HTML', reply_markup: inlineKeyboard },
+          );
+        } else {
+          // Просто текстовое сообщение
+          this.logger.log(`Редактируем текст сообщения ${messageId}`);
+          result = await this.bot.telegram.editMessageText(
+            Number(channelId),
+            messageId,
+            undefined,
+            `${newName}/n/n${contest?.description}`,
+            { parse_mode: 'HTML', reply_markup: inlineKeyboard },
+          );
+        }
       } else if (buttonText) {
         // Только обновляем кнопки
         this.logger.log(`Редактируем кнопки сообщения ${messageId}`);
+        const replyMarkup =
+          buttonText === 'none' ? { inline_keyboard: [] } : inlineKeyboard;
+
         result = await this.bot.telegram.editMessageReplyMarkup(
           Number(channelId),
           messageId,
           undefined,
-          inlineKeyboard,
+          replyMarkup,
         );
         this.logger.log(`Кнопки сообщения ${messageId} обновлены`);
       } else {

@@ -87,7 +87,7 @@ export class ContestService {
   }
 
   saveContest(data) {
-    this.logger.log('Сохранение конкурса в базу');
+    this.logger.log('Сохранение конкурса в базу', data);
     return this.contestRepo.save(data);
   }
 
@@ -202,7 +202,13 @@ export class ContestService {
     );
 
     // Если нужно обновить посты в телеграме
-    if (dto.description || dto.buttonText || dto.name || dto.imageUrl) {
+    if (
+      dto.name ||
+      dto.description ||
+      dto.buttonText ||
+      dto.name ||
+      dto.imageUrl
+    ) {
       for (const msgId of contest.telegramMessageIds ?? []) {
         if (!msgId) continue;
 
@@ -298,33 +304,82 @@ export class ContestService {
 
   async removeContest(id: number) {
     this.logger.warn(`Удаление конкурса id=${id}`);
-    const contest = await this.contestRepo.findOne({ where: { id } });
-    if (!contest) {
-      this.logger.error(`Попытка удалить несуществующий конкурс id=${id}`);
-      throw new NotFoundException('Contest not found');
-    }
+    try {
+      const contest = await this.contestRepo.findOne({ where: { id } });
+      if (!contest) {
+        this.logger.error(`Попытка удалить несуществующий конкурс id=${id}`);
+        throw new NotFoundException('Конкурс не найден');
+      }
 
-    const posts = contest.telegramMessageIds?.map((e) => {
-      const [chatId, messageId] = e.split(':');
-      return { chatId, messageId: Number(messageId) };
-    });
+      this.logger.debug(`Поиск постов если уже опубликовано`);
+      this.logger.debug(`CONTEST=======>`, contest);
 
-    if (posts?.length) {
-      this.logger.log(
-        `Удаление сообщений конкурса id=${id} из Telegram: ${posts.length} шт.`,
-      );
-      for (const post of posts) {
-        try {
-          await this._telegramPostService.deleteMessage(
-            post.chatId,
-            post.messageId,
-          );
-        } catch (err) {
-          this.logger.warn(
-            `Не удалось удалить сообщение ${post.chatId}:${post.messageId}`,
-          );
+      const posts = contest.telegramMessageIds?.map((e) => {
+        const [chatId, messageId] = e.split(':');
+        return { chatId, messageId: Number(messageId) };
+      });
+      console.log('POST====>', posts);
+
+      this.logger.debug(`Конкурс опубликован в: ${JSON.stringify(posts)}`);
+
+      if (posts?.length) {
+        this.logger.log(
+          `Удаление сообщений конкурса id=${id} из Telegram: ${posts.length} шт.`,
+        );
+        for (const post of posts) {
+          try {
+            await this._telegramPostService.deleteMessage(
+              post.chatId,
+              post.messageId,
+            );
+          } catch (err) {
+            this.logger.warn(
+              `Не удалось удалить сообщение ${post.chatId}:${post.messageId}`,
+            );
+          }
         }
       }
+
+      await this.contestRepo.remove(contest);
+
+      this.logger.debug(`Поиск задач конкурса`);
+
+      const taskPub = await this._cronService.findTaskByRef(
+        ScheduledTaskType.POST_PUBLISH,
+        id,
+      );
+      const taskFin = await this._cronService.findTaskByRef(
+        ScheduledTaskType.CONTEST_FINISH,
+        id,
+      );
+
+      this.logger.debug(
+        `Найдены таски: {taskPub: ${JSON.stringify(taskPub)}, taskFin: ${JSON.stringify(taskFin)}}`,
+      );
+
+      if (taskPub) {
+        this.logger.debug(`Удаление задачи из бд`);
+        await this._cronService.deleteTaskFromDb(taskPub.id);
+        this.logger.debug(`Удаление задачи`);
+        this._cronService.removeScheduledJob(taskPub);
+      }
+
+      if (taskFin) {
+        this.logger.debug(`Удаление задачи из бд`);
+        await this._cronService.deleteTaskFromDb(taskFin.id);
+        this.logger.debug(`Удаление задачи`);
+        this._cronService.removeScheduledJob(taskFin);
+      }
+    } catch (error) {
+      this.logger.error(error);
+      if (error instanceof HttpException) {
+        throw error; // пробрасываем оригинал
+      }
+
+      throw new HttpException(
+        'Ошибка при удалении поста',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -372,5 +427,91 @@ export class ContestService {
     }
 
     return result;
+  }
+
+  async completeContest(contestId: number): Promise<void> {
+    const contest = await this.contestRepo.findOne({
+      where: { id: contestId },
+    });
+
+    if (!contest) {
+      throw new HttpException('Конкурс не найден', HttpStatus.NOT_FOUND);
+    }
+
+    if (contest.status === 'completed') {
+      throw new HttpException('Конкурс уже завершён', HttpStatus.BAD_REQUEST);
+    }
+
+    this.logger.log(`✅ Конкурс #${contestId} завершён`);
+
+    const task = await this._cronService.findTaskByRef(
+      ScheduledTaskType.CONTEST_FINISH,
+      contestId,
+    );
+
+    if (!task)
+      throw new HttpException(
+        'Задача на завершение не найдена',
+        HttpStatus.CONFLICT,
+      );
+    await this._cronService.executeTask(task);
+  }
+
+  async cancelContest(contestId: number): Promise<void> {
+    const contest = await this.contestRepo.findOne({
+      where: { id: contestId },
+    });
+
+    if (!contest) {
+      throw new HttpException('Конкурс не найден', HttpStatus.NOT_FOUND);
+    }
+
+    if (contest.status === 'completed') {
+      throw new HttpException('Конкурс уже завершён', HttpStatus.BAD_REQUEST);
+    }
+
+    this.logger.log(`✅ Конкурс #${contestId} завершён`);
+    const taskPub = await this._cronService.findTaskByRef(
+      ScheduledTaskType.POST_PUBLISH,
+      contestId,
+    );
+    const taskFin = await this._cronService.findTaskByRef(
+      ScheduledTaskType.CONTEST_FINISH,
+      contestId,
+    );
+
+    this.logger.debug(
+      `Найдены таски: {taskPub: ${JSON.stringify(taskPub)}, taskFin: ${JSON.stringify(taskFin)}}`,
+    );
+
+    if (taskPub) {
+      this.logger.debug(`Удаление задачи из бд`);
+      await this._cronService.deleteTaskFromDb(taskPub.id);
+      this.logger.debug(`Удаление задачи`);
+      this._cronService.removeScheduledJob(taskPub);
+    }
+
+    if (taskFin) {
+      this.logger.debug(`Удаление задачи из бд`);
+      await this._cronService.deleteTaskFromDb(taskFin.id);
+      this.logger.debug(`Удаление задачи`);
+      this._cronService.removeScheduledJob(taskFin);
+    }
+    contest.status = 'completed';
+    await this.contestRepo.save(contest);
+
+    for (const msgId of contest.telegramMessageIds ?? []) {
+      if (!msgId) continue;
+
+      const [chatId, messageId] = msgId.split(':');
+      await this._telegramPostService.editPost(
+        chatId,
+        Number(messageId),
+        contest,
+        undefined,
+        undefined,
+        'none',
+      );
+    }
   }
 }

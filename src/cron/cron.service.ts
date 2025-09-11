@@ -139,12 +139,15 @@ export class CronService {
                 contest.buttonText,
               );
               const messageIdStr = `${telegramMessageId[0].chatId}:${telegramMessageId[0].messageId}`;
+              console.log('АЙДИПОСТА======>', messageIdStr);
+
               telegramMessageIds.push(messageIdStr);
               this.logger.log(
                 `Конкурс ${contest.id} отправлен в канал ${channel.telegramId}`,
               );
             }),
           );
+          console.log('АЙДИПОСТОВ======>', contest.status);
 
           if (contest.status === 'pending') {
             contest.telegramMessageIds = telegramMessageIds;
@@ -266,7 +269,7 @@ export class CronService {
     }
   }
 
-  private async executeTask(task: ScheduledTask) {
+  public async executeTask(task: ScheduledTask) {
     this.logger.log(
       `Немедленное выполнение задачи: ${task.type}-${task.referenceId}`,
     );
@@ -307,6 +310,9 @@ export class CronService {
           this.logger.log(`Конкурс ${contest.id} активирован`);
         }
       }
+      this.logger.debug(
+        `Тип задачи в БД: ${task.type}, ожидаем: ${ScheduledTaskType.CONTEST_FINISH}`,
+      );
 
       if (task.type === ScheduledTaskType.CONTEST_FINISH) {
         contest.status = 'completed';
@@ -317,6 +323,14 @@ export class CronService {
       // обновляем статус задачи
       task.status = ScheduledTaskStatus.COMPLETED;
       await this.scheduledTaskRepo.save(task);
+
+      const job = this.schedulerRegistry.getCronJob(
+        `${task.type}-${task.referenceId}`,
+      );
+
+      await job.fireOnTick();
+      this.schedulerRegistry.deleteCronJob(`${task.type}-${task.referenceId}`);
+      this.logger.log(`CronJob ${`${task.type}-${task.referenceId}`} удалена`);
     } catch (err) {
       this.logger.error(
         `Ошибка при выполнении задачи ${task.type}-${task.referenceId}`,
