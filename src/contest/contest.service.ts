@@ -193,22 +193,14 @@ export class ContestService {
       throw new NotFoundException('Contest not found');
     }
 
-    // Обновляем поля в объекте
     Object.assign(contest, dto);
 
-    // Логируем изменения
     this.logger.debug(
       `Поля для обновления: ${JSON.stringify(dto)} | Конкурс id=${id}`,
     );
 
     // Если нужно обновить посты в телеграме
-    if (
-      dto.name ||
-      dto.description ||
-      dto.buttonText ||
-      dto.name ||
-      dto.imageUrl
-    ) {
+    if (dto.description || dto.buttonText || dto.name || dto.imageUrl) {
       for (const msgId of contest.telegramMessageIds ?? []) {
         if (!msgId) continue;
 
@@ -217,6 +209,7 @@ export class ContestService {
           chatId,
           Number(messageId),
           contest,
+          contest.name,
           contest.description,
           contest.imageUrl ?? undefined,
           contest.buttonText,
@@ -236,11 +229,43 @@ export class ContestService {
         }),
       );
     }
-    this.logger.log(`Добавлены победители ${contest.winners}`);
+    this.logger.log(`Добавлены победители ${JSON.stringify(contest.winners)}`);
 
     const updated = await this.contestRepo.save(contest);
 
     this.logger.log(`Конкурс id=${id} успешно обновлён`);
+
+    if (dto.endDate) {
+      this.logger.debug(
+        `Изменение даты завершения для конкурса: {id:${contest.id} name: ${contest.name}`,
+      );
+
+      this.logger.debug(`Поиск крона для завершения конкурса`);
+      const task = await this._cronService.findTaskByRef(
+        ScheduledTaskType.CONTEST_FINISH,
+        id,
+      );
+
+      if (task) {
+        this.logger.debug(
+          `Найдена задача для конкурса: ${JSON.stringify(task)}`,
+        );
+        this.logger.debug(`Удаление задачи с ${task.id} из бд`);
+        await this._cronService.deleteTaskFromDb(task.id);
+        this.logger.debug(`Задача удалена из бд`);
+
+        this.logger.debug(`Удаление крон джобы`);
+        this._cronService.removeScheduledJob(task);
+      }
+
+      this.logger.debug(`Запись новой таски в бд`);
+      await this._cronService.createTaskInDb({
+        type: ScheduledTaskType.CONTEST_FINISH,
+        referenceId: contest.id,
+        runAt: dto.endDate,
+      });
+      this.logger.debug(`Таска записана в бд`);
+    }
 
     return updated;
   }
@@ -508,6 +533,7 @@ export class ContestService {
         chatId,
         Number(messageId),
         contest,
+        undefined,
         undefined,
         undefined,
         'none',

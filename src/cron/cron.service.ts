@@ -171,7 +171,8 @@ export class CronService {
                   contest,
                   undefined,
                   undefined,
-                  'Конкурс завершен',
+                  undefined,
+                  'Узнать результат',
                 );
               }
             }
