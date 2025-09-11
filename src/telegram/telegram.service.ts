@@ -421,8 +421,6 @@ export class TelegramService {
       this.logger.log(
         `Редактирование поста ${messageId} в канале ${channelId}`,
       );
-      console.log(newImageUrl);
-
       let result: unknown;
 
       if (newImageUrl) {
