@@ -70,7 +70,7 @@ export class ContestController {
   @Delete(':contestId')
   async remove(@Param('contestId', ParseIntPipe) contestId: number) {
     this.logger.warn(`Удаление конкурса id=${contestId}`);
-    await this.contestService.removeContest(contestId);
+    return this.contestService.removeContest(contestId);
   }
 
   @Patch(':id')
@@ -95,5 +95,15 @@ export class ContestController {
     this.logger.log(`Обновление конкурса id=${id}`);
     if (image) dto['imageUrl'] = `/uploads/${image.filename}`;
     return this.contestService.updateContest(id, dto);
+  }
+
+  @Patch(':id/complete')
+  async complete(@Param('id', ParseIntPipe) id: number) {
+    return await this.contestService.completeContest(id);
+  }
+
+  @Patch(':id/cancel')
+  async cancel(@Param('id', ParseIntPipe) id: number) {
+    return await this.contestService.cancelContest(id);
   }
 }
