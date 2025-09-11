@@ -405,6 +405,8 @@ export class TelegramService {
     newImageUrl?: string,
     buttonText?: string,
   ): Promise<TextMessage | PhotoMessage | true | undefined> {
+    console.log(1231231231231, newName);
+
     const webAppUrl = `https://t.me/my_test_contest_bot/apprandom?startapp=${channelId}_${contest.id}`;
     const inlineKeyboard: InlineKeyboardMarkup = {
       inline_keyboard: [
@@ -449,7 +451,7 @@ export class TelegramService {
             Number(channelId),
             messageId,
             undefined,
-            `${contest.name}/n/n${newText}`,
+            `${contest.name}\n\n${newText}`,
             { parse_mode: 'HTML', reply_markup: inlineKeyboard },
           );
         } else {
@@ -459,12 +461,13 @@ export class TelegramService {
             Number(channelId),
             messageId,
             undefined,
-            `${contest.name}/n/n${newText}`,
+            `${contest.name}\n\n${newText}`,
             { parse_mode: 'HTML', reply_markup: inlineKeyboard },
           );
         }
         this.logger.log(`Текст сообщения ${messageId} обновлён`);
       }
+
       if (newName) {
         if (contest?.imageUrl) {
           this.logger.log(`Редактируем caption фото сообщения ${messageId}`);
@@ -472,7 +475,7 @@ export class TelegramService {
             Number(channelId),
             messageId,
             undefined,
-            `${newName}/n/n${contest?.description}`,
+            `${newName}\n\n${contest?.description}`,
             { parse_mode: 'HTML', reply_markup: inlineKeyboard },
           );
         } else {
@@ -482,7 +485,7 @@ export class TelegramService {
             Number(channelId),
             messageId,
             undefined,
-            `${newName}/n/n${contest?.description}`,
+            `${newName}\n\n${contest?.description}`,
             { parse_mode: 'HTML', reply_markup: inlineKeyboard },
           );
         }

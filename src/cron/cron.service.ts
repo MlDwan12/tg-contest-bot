@@ -34,8 +34,7 @@ export class CronService {
     private _telegramService: TelegramService,
     private _contestParticipationService: ContestParticipationService,
     @InjectBot() private readonly bot: Telegraf<any>,
-  ) {
-  }
+  ) {}
 
   async createTaskInDb(task: {
     type: ScheduledTaskType;
@@ -133,7 +132,7 @@ export class CronService {
             channels.map(async (channel) => {
               const telegramMessageId = await this._telegramService.sendPosts(
                 channel.telegramId,
-                `${contest.name} <br> ${contest.description} /n/n тест после пробела`,
+                `${contest.name}\n\n${contest.description}`,
                 contest.imageUrl,
                 contest.id,
                 channel.telegramId,
@@ -176,6 +175,7 @@ export class CronService {
           }
 
           const winners = await this.contestService.getWinners(contest.id);
+          console.log('WINNERS===>', winners);
 
           if (winners.length) {
             await Promise.all(

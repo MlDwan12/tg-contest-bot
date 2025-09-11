@@ -170,6 +170,14 @@ export class ContestService {
       this.logger.log(
         `Создана cron-задача публикации конкурса id=${savedContest.id}`,
       );
+      this._cronService.scheduleTask({
+        type: ScheduledTaskType.POST_PUBLISH,
+        referenceId: savedContest.id,
+        runAt: savedContest.startDate,
+      });
+      this.logger.log(
+        `Запланирована публикация конкурса id=${savedContest.id} локально`,
+      );
     } else {
       this._cronService.scheduleTask({
         type: ScheduledTaskType.CONTEST_FINISH,
@@ -300,6 +308,8 @@ export class ContestService {
       throw new HttpException('конкурс не найден', HttpStatus.NOT_FOUND);
     }
     let winners: number[] = [];
+    console.log(1231231231231, contest.winners);
+    console.log(1231231231232, contest.winners);
 
     if (contest.winners?.length) {
       winners = contest.winners.flatMap((e) => {
