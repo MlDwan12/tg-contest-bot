@@ -301,10 +301,11 @@ export class ContestService {
     const contest = await this.contestRepo.findOne({
       where: { id: constestId },
       relations: {
-        participants: { user: true },
+        participants: { user: true, contest: { requiredGroups: true } },
         winners: { user: { participations: { contest: true } } },
       },
     });
+    console.log('1231231231231231231===>', contest);
 
     if (!contest) {
       this.logger.error(`Конкурс id=${constestId} не найден`);
