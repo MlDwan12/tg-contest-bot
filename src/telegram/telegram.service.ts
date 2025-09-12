@@ -159,22 +159,24 @@ export class TelegramService {
   async sendPrivateMessage(
     telegramId: number | string,
     text: string,
-    channelUsername: string,
-    messageId: string,
+    channelUsername?: string,
+    messageId?: string,
   ): Promise<Message.TextMessage | Message.PhotoMessage> {
     try {
       this.logger.log(`Отправка ЛС пользователю ${telegramId}`);
       return await this.bot.telegram.sendMessage(telegramId, text, {
         parse_mode: 'HTML',
         reply_markup: {
-          inline_keyboard: [
-            [
-              {
-                text: 'Перейти к конкурсу 🎲',
-                url: `https://t.me/${channelUsername}/${messageId}`,
-              },
-            ],
-          ],
+          inline_keyboard: channelUsername
+            ? [
+                [
+                  {
+                    text: 'Перейти к конкурсу 🎲',
+                    url: `https://t.me/${channelUsername}/${messageId}`,
+                  },
+                ],
+              ]
+            : [],
         },
       });
     } catch (err) {

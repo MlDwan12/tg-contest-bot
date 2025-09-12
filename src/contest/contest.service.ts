@@ -18,6 +18,9 @@ import { ScheduledTaskType } from 'src/cron/entities/cron.entity';
 import { UsersService } from 'src/users/users.service';
 import { ContestParticipationService } from 'src/contest-participation/contest-participation.service';
 import { ContestWinner } from './entities/contest_winners.entity';
+import { join } from 'path';
+import { promises as fs } from 'fs';
+import { ContestParticipation } from 'src/contest-participation/entities/contest-participation.entity';
 
 @Injectable()
 export class ContestService {
@@ -298,18 +301,17 @@ export class ContestService {
     const contest = await this.contestRepo.findOne({
       where: { id: constestId },
       relations: {
-        participants: { user: true },
+        participants: { user: true, contest: { requiredGroups: true } },
         winners: { user: { participations: { contest: true } } },
       },
     });
+    console.log('1231231231231231231===>', contest);
 
     if (!contest) {
       this.logger.error(`Конкурс id=${constestId} не найден`);
       throw new HttpException('конкурс не найден', HttpStatus.NOT_FOUND);
     }
     let winners: number[] = [];
-    console.log(1231231231231, contest.winners);
-    console.log(1231231231232, contest.winners);
 
     if (contest.winners?.length) {
       winners = contest.winners.flatMap((e) => {
@@ -321,10 +323,8 @@ export class ContestService {
           .filter((p) => p !== undefined);
       });
     }
-    console.log(123, winners);
-
     if (contest.participants && !contest.winners.length) {
-      const randomElements = this.getRandomElement(
+      const randomElements = await this.getRandomElement(
         contest.participants,
         contest.prizePlaces,
       );
@@ -348,6 +348,20 @@ export class ContestService {
 
       this.logger.debug(`Поиск постов если уже опубликовано`);
       this.logger.debug(`CONTEST=======>`, contest);
+
+      if (contest.imageUrl) {
+        const filePath = join(process.cwd(), contest.imageUrl); // contest.imageUrl типа "/uploads/123.png"
+        try {
+          await fs.unlink(filePath);
+          this.logger.log(`Картинка конкурса удалена: ${filePath}`);
+        } catch (err) {
+          if (err.code !== 'ENOENT') {
+            this.logger.warn(`Не удалось удалить картинку: ${filePath}`, err);
+          } else {
+            this.logger.debug(`Картинка уже отсутствует: ${filePath}`);
+          }
+        }
+      }
 
       const posts = contest.telegramMessageIds?.map((e) => {
         const [chatId, messageId] = e.split(':');
@@ -446,16 +460,29 @@ export class ContestService {
     return telegramMessageIds;
   }
 
-  private getRandomElement<T>(arr: T[], count: number): T[] {
+  private async getRandomElement(
+    arr: ContestParticipation[],
+    count: number,
+  ): Promise<ContestParticipation[]> {
     this.logger.log(`Выбор случайных элементов (${count}) из массива`);
     if (!arr || arr.length === 0 || count <= 0) return [];
-    const result: T[] = [];
+    const result: ContestParticipation[] = [];
     const usedIndices = new Set<number>();
     const n = Math.min(count, arr.length);
 
     while (result.length < n) {
       const randomIndex = Math.floor(Math.random() * arr.length);
-      if (!usedIndices.has(randomIndex)) {
+      console.log('Проверка подписок');
+
+      const isUnsub = (
+        await this._telegramPostService.isUserSubscribed(
+          arr[randomIndex].contest.requiredGroups,
+          Number(arr[randomIndex].user.telegramId),
+        )
+      ).some((r) => !r.subscribed);
+      console.log('Отписался от чего-то', isUnsub);
+
+      if (!usedIndices.has(randomIndex) && !isUnsub) {
         usedIndices.add(randomIndex);
         result.push(arr[randomIndex]);
       }
