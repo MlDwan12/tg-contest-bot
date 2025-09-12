@@ -136,11 +136,15 @@ export class CronService {
         const telegramMessageIds: string[] = [];
 
         if (task.type === ScheduledTaskType.POST_PUBLISH) {
+          const channelsName = contest.requiredGroups
+            .map((e) => `@${e.telegramName}`)
+            .join('\n\n');
+
           await Promise.all(
             channels.map(async (channel) => {
               const telegramMessageId = await this._telegramService.sendPosts(
                 channel.telegramId,
-                `${contest.name}\n\n${contest.description}`,
+                `${contest.name}\n\n${contest.description}\n\n${channelsName}`,
                 contest.imageUrl,
                 contest.id,
                 channel.telegramId,
