@@ -38,7 +38,7 @@ export class ContestParticipationService {
 
     // Проверка подписки
     await this.telegramService.isUserSubscribed(
-      contest.allowedGroups,
+      contest.requiredGroups,
       Number(user.telegramId),
     );
     this.logger.log(
