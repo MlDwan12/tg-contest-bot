@@ -76,6 +76,24 @@ export class ContestParticipationService {
     this.logger.log(
       `Участие пользователя ${user.id} создано с id=${participation.id}`,
     );
+
+    if (contest.telegramMessageIds?.length) {
+      await Promise.all(
+        contest.telegramMessageIds.map(async (e) => {
+          const [channel, message] = e.split(':');
+
+          await this.telegramService.editPost(
+            channel,
+            Number(message),
+            contest,
+            undefined,
+            undefined,
+            undefined,
+            `${contest.buttonText} (${contest.participants.length + 1})`,
+          );
+        }),
+      );
+    }
     return [];
   }
 
@@ -103,6 +121,8 @@ export class ContestParticipationService {
     );
 
     const participantsUpdate = participants;
+    console.log('contest.winners.=====>', contest.winners);
+    console.log('contest.winnerStrategy=====>', contest.winnerStrategy);
 
     if (contest.winnerStrategy === 'manual' && !contest.winners.length) {
       contest.winnerStrategy = 'random';

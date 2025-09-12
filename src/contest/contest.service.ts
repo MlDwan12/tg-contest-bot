@@ -195,7 +195,7 @@ export class ContestService {
     return savedContest;
   }
 
-  async updateContest(id: number, dto: UpdateContestDto): Promise<Contest> {
+  async updateContest(id: number, dto: UpdateContestDto): Promise<any> {
     this.logger.log(`Обновление конкурса id=${id}`);
 
     const contest = await this.contestRepo.findOne({ where: { id } });
@@ -228,20 +228,25 @@ export class ContestService {
       }
     }
 
+    console.log(111111111111, dto.winners);
     if (dto.winners) {
-      contest.winners = await Promise.all(
+      // Сохраняем победителей вручную через репозиторий
+      const winners = await Promise.all(
         dto.winners.split(',').map(async (userId) => {
           const winner = new ContestWinner();
           winner.user = await this._userService.findOrCreate({
             telegramId: Number(userId),
           });
-          // winner.contest = contest;
-          return winner;
+          winner.contest = contest; // обязательно указываем ссылку на конкурс
+          return this.contestWinnerRepo.save(winner); // сохраняем и возвращаем
         }),
       );
-    }
-    this.logger.log(`Добавлены победители ${JSON.stringify(contest.winners)}`);
 
+      // Обновляем relation вручную (без cascade)
+      contest.winners = winners;
+    }
+
+    // Сохраняем сам конкурс (без cascade на winners)
     const updated = await this.contestRepo.save(contest);
 
     this.logger.log(`Конкурс id=${id} успешно обновлён`);
@@ -278,7 +283,12 @@ export class ContestService {
       this.logger.debug(`Таска записана в бд`);
     }
 
-    return updated;
+    const res = await this.contestRepo.findOne({
+      where: { id: contest.id },
+      relations: ['winners', 'winners.user'], // подгружаем победителей и их пользователей
+    });
+
+    return res;
   }
 
   async myContest(id: string, chatId: string) {

@@ -7,7 +7,9 @@ export class ContestWinner {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => Contest, (contest) => contest.winners, { cascade: true })
+  @ManyToOne(() => Contest, (contest) => contest.winners, {
+    onDelete: 'CASCADE',
+  })
   contest: Contest;
 
   @ManyToOne(() => User)
