@@ -18,6 +18,8 @@ import { ScheduledTaskType } from 'src/cron/entities/cron.entity';
 import { UsersService } from 'src/users/users.service';
 import { ContestParticipationService } from 'src/contest-participation/contest-participation.service';
 import { ContestWinner } from './entities/contest_winners.entity';
+import { join } from 'path';
+import { promises as fs } from 'fs';
 
 @Injectable()
 export class ContestService {
@@ -348,6 +350,20 @@ export class ContestService {
 
       this.logger.debug(`Поиск постов если уже опубликовано`);
       this.logger.debug(`CONTEST=======>`, contest);
+
+      if (contest.imageUrl) {
+        const filePath = join(process.cwd(), contest.imageUrl); // contest.imageUrl типа "/uploads/123.png"
+        try {
+          await fs.unlink(filePath);
+          this.logger.log(`Картинка конкурса удалена: ${filePath}`);
+        } catch (err) {
+          if (err.code !== 'ENOENT') {
+            this.logger.warn(`Не удалось удалить картинку: ${filePath}`, err);
+          } else {
+            this.logger.debug(`Картинка уже отсутствует: ${filePath}`);
+          }
+        }
+      }
 
       const posts = contest.telegramMessageIds?.map((e) => {
         const [chatId, messageId] = e.split(':');

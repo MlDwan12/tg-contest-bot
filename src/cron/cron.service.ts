@@ -20,10 +20,12 @@ import { TelegramService } from 'src/telegram/telegram.service';
 import { ContestParticipationService } from 'src/contest-participation/contest-participation.service';
 import { Telegraf } from 'telegraf';
 import { InjectBot } from 'nestjs-telegraf';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class CronService {
   private readonly logger = new Logger(CronService.name);
+  private readonly adminIds: string[];
 
   constructor(
     private readonly schedulerRegistry: SchedulerRegistry,
@@ -34,7 +36,13 @@ export class CronService {
     private _telegramService: TelegramService,
     private _contestParticipationService: ContestParticipationService,
     @InjectBot() private readonly bot: Telegraf<any>,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.adminIds = this.configService
+      .get<string>('ADMIN_IDS')!
+      .split(',')
+      .map((id) => id.trim());
+  }
 
   async createTaskInDb(task: {
     type: ScheduledTaskType;
@@ -175,7 +183,6 @@ export class CronService {
           }
 
           const winners = await this.contestService.getWinners(contest.id);
-          console.log('WINNERS===>', winners);
 
           if (winners.length) {
             await Promise.all(
@@ -211,6 +218,16 @@ export class CronService {
                   messageIds[0]!,
                 );
               }),
+            );
+          }
+          const channelsName = contest.allowedGroups
+            .map((e) => `@${e.telegramName}`)
+            .join('\n\n');
+
+          for (const adminId of this.adminIds) {
+            await this._telegramService.sendPrivateMessage(
+              adminId,
+              `Завершен конкурс: ${contest.name}\n\nГруппы, которые участвовали в розыгрыше:\n\n${channelsName}`,
             );
           }
         }
