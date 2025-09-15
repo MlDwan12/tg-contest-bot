@@ -416,7 +416,7 @@ export class TelegramService {
 
     const webAppUrl = `https://t.me/my_test_contest_bot/apprandom?startapp=${channelId}_${contest.id}`;
     const countPart =
-      contest.status === 'active' ? `(${contest.participants.length})` : '';
+      contest.status === 'active' ? `(${contest.participants.length + 1})` : '';
     const inlineKeyboard: InlineKeyboardMarkup =
       buttonText === 'none'
         ? { inline_keyboard: [] }

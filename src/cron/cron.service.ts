@@ -193,32 +193,33 @@ export class CronService {
                     this.getValueByGroupId(msgId, group.telegramId),
                   );
 
-                for (const msgId of contest.telegramMessageIds ?? []) {
-                  if (msgId) {
-                    await this._telegramService.editPost(
-                      msgId.split(':')[0],
-                      Number(msgId.split(':')[1]),
-                      contest,
-                      undefined,
-                      undefined,
-                      undefined,
-                      'Узнать результат',
-                    );
-                  }
-                }
-
-                await this._telegramService.sendPrivateMessage(
+                const test = await this._telegramService.sendPrivateMessage(
                   winner.user.telegramId,
                   'Поздравляю, вы победили в конкурсе 🎉',
                   group.telegramName,
                   messageIds[0]!,
                 );
+                console.log('[TEST RESULT] ====>', test);
                 console.log(
                   'winner.user.telegramId=======>',
                   winner.user.telegramId,
                 );
               }),
             );
+
+            for (const msgId of contest.telegramMessageIds ?? []) {
+              if (msgId) {
+                await this._telegramService.editPost(
+                  msgId.split(':')[0],
+                  Number(msgId.split(':')[1]),
+                  contest,
+                  undefined,
+                  undefined,
+                  undefined,
+                  'Узнать результат',
+                );
+              }
+            }
 
             for (const adminId of this.adminIds) {
               await this._telegramService.sendPrivateMessage(
@@ -231,7 +232,7 @@ export class CronService {
             for (const adminId of this.adminIds) {
               await this._telegramService.sendPrivateMessage(
                 adminId,
-                `Произошла ошибка при завершен конкурса: ${contest.name}\n\nНужно завершить конкурс в ручную, через админ панель.`,
+                `Произошла ошибка при выборе победителей`,
               );
             }
           }
@@ -243,6 +244,13 @@ export class CronService {
           `Ошибка выполнения задачи ${task.type}-${task.referenceId}`,
           err.stack,
         );
+
+        for (const adminId of this.adminIds) {
+          await this._telegramService.sendPrivateMessage(
+            adminId,
+            `Произошла ошибка при завершен конкурса: ${contest.name}\n\nНужно завершить конкурс в ручную, через админ панель.`,
+          );
+        }
       }
     });
 

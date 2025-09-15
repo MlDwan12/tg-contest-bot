@@ -24,7 +24,8 @@ export class ContestParticipationService {
     private readonly telegramService: TelegramService,
     @Inject(forwardRef(() => ContestService))
     private contestService: ContestService,
-  ) {}
+  ) {
+  }
 
   async registerParticipation(
     user: User,
@@ -89,7 +90,7 @@ export class ContestParticipationService {
             undefined,
             undefined,
             undefined,
-            `${contest.buttonText} (${contest.participants.length + 1})`,
+            contest.buttonText,
           );
         }),
       );
