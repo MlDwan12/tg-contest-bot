@@ -37,7 +37,8 @@ export class ContestService {
     private readonly _cronService: CronService,
     private readonly _contestParticipationService: ContestParticipationService,
     private readonly _userService: UsersService,
-  ) {}
+  ) {
+  }
 
   private readonly channels = '-1002949180383';
 
@@ -99,14 +100,14 @@ export class ContestService {
 
     const allowedChannels = dto.allowedGroups
       ? await this._channelService.findMany(
-          dto.allowedGroups.split(',').map(String),
-        )
+        dto.allowedGroups.split(',').map(String),
+      )
       : [];
 
     const requiredChannels = dto.requiredGroups
       ? await this._channelService.findMany(
-          dto.requiredGroups.split(',').map(String),
-        )
+        dto.requiredGroups.split(',').map(String),
+      )
       : [];
 
     const creator = await this._adminService.findOne({ id: dto.creatorId });
@@ -198,7 +199,7 @@ export class ContestService {
   async updateContest(id: number, dto: UpdateContestDto): Promise<any> {
     this.logger.log(`Обновление конкурса id=${id}`);
 
-    const contest = await this.contestRepo.findOne({ where: { id } });
+    const contest = await this.contestRepo.findOne({ where: { id }, relations: {participants: true} });
     if (!contest) {
       this.logger.error(`Конкурс id=${id} не найден`);
       throw new NotFoundException('Contest not found');
@@ -211,24 +212,25 @@ export class ContestService {
     );
 
     // Если нужно обновить посты в телеграме
+    console.log('TEST ======> ', contest.telegramMessageIds);
     if (dto.description || dto.buttonText || dto.name || dto.imageUrl) {
       for (const msgId of contest.telegramMessageIds ?? []) {
         if (!msgId) continue;
-
+        console.log('MSG_ID ====> ', msgId);
         const [chatId, messageId] = msgId.split(':');
         await this._telegramPostService.editPost(
           chatId,
           Number(messageId),
           contest,
-          contest.name,
-          contest.description,
-          contest.imageUrl ?? undefined,
-          contest.buttonText,
+          dto.name ?? undefined,
+          dto.description ?? undefined,
+          dto.imageUrl ?? undefined,
+          dto.buttonText ?? undefined,
         );
       }
     }
 
-    console.log(111111111111, dto.winners);
+    console.log('{WINERS} ==== ', dto.winners);
     if (dto.winners) {
       // Сохраняем победителей вручную через репозиторий
       const winners = await Promise.all(
@@ -312,7 +314,7 @@ export class ContestService {
       where: { id: constestId },
       relations: {
         participants: { user: true, contest: { requiredGroups: true } },
-        winners: { user: { participations: { contest: true } } },
+        winners: { user: { participations: { contest: { requiredGroups: true } } } },
       },
     });
     console.log('1231231231231231231===>', contest);
@@ -482,12 +484,14 @@ export class ContestService {
 
     while (result.length < n) {
       const randomIndex = Math.floor(Math.random() * arr.length);
-      console.log('Проверка подписок');
+      console.log('1 Проверка подписок ===', arr[randomIndex]);
+      console.log('2 Проверка подписок ===', arr[randomIndex].contest);
 
       const isUnsub = (
         await this._telegramPostService.isUserSubscribed(
           arr[randomIndex].contest.requiredGroups,
           Number(arr[randomIndex].user.telegramId),
+          false,
         )
       ).some((r) => !r.subscribed);
       console.log('Отписался от чего-то', isUnsub);

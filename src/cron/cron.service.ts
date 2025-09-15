@@ -168,23 +168,13 @@ export class CronService {
             this.logger.log(`Конкурс ${contest.id} активирован`);
           }
         } else if (task.type === ScheduledTaskType.CONTEST_FINISH) {
+          this.logger.log(`Запуск завершения конкурса ${contest.id}`);
+          const channelsName = contest.allowedGroups
+            .map((e) => `@${e.telegramName}`)
+            .join('\n\n');
+
           contest.status = 'completed';
           await this.contestService.saveContest(contest);
-          this.logger.log(`Конкурс ${contest.id} завершен`);
-
-          for (const msgId of contest.telegramMessageIds ?? []) {
-            if (msgId) {
-              await this._telegramService.editPost(
-                msgId.split(':')[0],
-                Number(msgId.split(':')[1]),
-                contest,
-                undefined,
-                undefined,
-                undefined,
-                'Узнать результат',
-              );
-            }
-          }
 
           const winners = await this.contestService.getWinners(contest.id);
 
@@ -211,6 +201,10 @@ export class CronService {
                       msgId.split(':')[0],
                       Number(msgId.split(':')[1]),
                       contest,
+                      undefined,
+                      undefined,
+                      undefined,
+                      'Узнать результат',
                     );
                   }
                 }
@@ -223,16 +217,21 @@ export class CronService {
                 );
               }),
             );
-          }
-          const channelsName = contest.allowedGroups
-            .map((e) => `@${e.telegramName}`)
-            .join('\n\n');
 
-          for (const adminId of this.adminIds) {
-            await this._telegramService.sendPrivateMessage(
-              adminId,
-              `Завершен конкурс: ${contest.name}\n\nГруппы, которые участвовали в розыгрыше:\n\n${channelsName}`,
-            );
+            for (const adminId of this.adminIds) {
+              await this._telegramService.sendPrivateMessage(
+                adminId,
+                `Завершен конкурс: ${contest.name}\n\nГруппы, которые участвовали в розыгрыше:\n\n${channelsName}`,
+              );
+            }
+            this.logger.log(`Конкурс ${contest.id} завершен`);
+          } else {
+            for (const adminId of this.adminIds) {
+              await this._telegramService.sendPrivateMessage(
+                adminId,
+                `Произошла ошибка при завершен конкурса: ${contest.name}\n\nНужно завершить конкурс в ручную, через админ панель.`,
+              );
+            }
           }
         }
 
