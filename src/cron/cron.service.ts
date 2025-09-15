@@ -86,7 +86,7 @@ export class CronService {
       }
 
       const runAt = new Date(task.runAt);
-      if (runAt <= now) {
+      if (runAt <= now && task.type === ScheduledTaskType.POST_PUBLISH) {
         // просрочено — запускаем немедленно
         this.logger.log(`Просроченная задача ${jobName}, запускаем немедленно`);
         await this.executeTask(task); // нужно, чтобы у тебя был метод выполнить задачу сразу
@@ -151,7 +151,6 @@ export class CronService {
                 contest.buttonText,
               );
               const messageIdStr = `${telegramMessageId[0].chatId}:${telegramMessageId[0].messageId}`;
-              console.log('АЙДИПОСТА======>', messageIdStr);
 
               telegramMessageIds.push(messageIdStr);
               this.logger.log(
@@ -159,7 +158,6 @@ export class CronService {
               );
             }),
           );
-          console.log('АЙДИПОСТОВ======>', contest.status);
 
           if (contest.status === 'pending') {
             contest.telegramMessageIds = telegramMessageIds;
@@ -209,11 +207,15 @@ export class CronService {
                   }
                 }
 
-                return this._telegramService.sendPrivateMessage(
+                await this._telegramService.sendPrivateMessage(
                   winner.user.telegramId,
                   'Поздравляю, вы победили в конкурсе 🎉',
                   group.telegramName,
                   messageIds[0]!,
+                );
+                console.log(
+                  'winner.user.telegramId=======>',
+                  winner.user.telegramId,
                 );
               }),
             );

@@ -19,8 +19,7 @@ type PhotoMessage = Message.PhotoMessage;
 export class TelegramService {
   private readonly logger = new Logger(TelegramService.name);
 
-  constructor(@InjectBot() private readonly bot: Telegraf<any>) {
-  }
+  constructor(@InjectBot() private readonly bot: Telegraf<any>) {}
 
   async sendPosts(
     chatIds: string | string[],
@@ -122,7 +121,11 @@ export class TelegramService {
     }
   }
 
-  async isUserSubscribed(chats: Channel[], telegramId: number, needCheck: boolean = true) {
+  async isUserSubscribed(
+    chats: Channel[],
+    telegramId: number,
+    needCheck: boolean = true,
+  ) {
     this.logger.log(
       `Проверка подписки пользователя ${telegramId} в ${chats.length} чатах`,
     );
@@ -170,13 +173,13 @@ export class TelegramService {
         reply_markup: {
           inline_keyboard: channelUsername
             ? [
-              [
-                {
-                  text: 'Перейти к конкурсу 🎲',
-                  url: `https://t.me/${channelUsername}/${messageId}`,
-                },
-              ],
-            ]
+                [
+                  {
+                    text: 'Перейти к конкурсу 🎲',
+                    url: `https://t.me/${channelUsername}/${messageId}`,
+                  },
+                ],
+              ]
             : [],
         },
       });
@@ -412,19 +415,21 @@ export class TelegramService {
     console.log('fields ====> ', { newName, newText, newImageUrl, buttonText });
 
     const webAppUrl = `https://t.me/my_test_contest_bot/apprandom?startapp=${channelId}_${contest.id}`;
-    const countPart = contest.status === 'active' ? `(${contest.participants.length})` : '';
-    const inlineKeyboard: InlineKeyboardMarkup = buttonText === 'none'
-      ? { inline_keyboard: [] }
-      : {
-        inline_keyboard: [
-          [
-            {
-              text: `${buttonText ?? contest.buttonText ?? 'Участвую! 🎉'} ${countPart}`,
-              url: webAppUrl,
-            },
-          ],
-        ],
-      };
+    const countPart =
+      contest.status === 'active' ? `(${contest.participants.length})` : '';
+    const inlineKeyboard: InlineKeyboardMarkup =
+      buttonText === 'none'
+        ? { inline_keyboard: [] }
+        : {
+            inline_keyboard: [
+              [
+                {
+                  text: `${buttonText ?? contest.buttonText ?? 'Участвую! 🎉'} ${countPart}`,
+                  url: webAppUrl,
+                },
+              ],
+            ],
+          };
     const contentText = `${newName ?? contest.name}\n\n${newText ?? contest.description}`;
 
     try {
@@ -479,7 +484,6 @@ export class TelegramService {
         this.logger.log(`Текст сообщения ${messageId} обновлён`);
         return result as TextMessage | PhotoMessage | true | undefined;
       }
-
     } catch (err) {
       this.logger.error(
         `Ошибка при редактировании поста ${messageId} в канале ${channelId}: ${err.message}`,

@@ -29,8 +29,6 @@ export class AuthController {
     @Body() body: { userName: string; password: string },
     @Res({ passthrough: true }) res: Response,
   ) {
-    console.log('BODY====>', body);
-
     this.logger.log(`Попытка входа: ${body.userName}`);
 
     const user = await this.authService.validateUser(
@@ -46,7 +44,6 @@ export class AuthController {
     const { accessToken, refreshToken } = await this.authService.generateTokens(
       user!,
     );
-    console.log('======>', accessToken, refreshToken);
 
     res.cookie('refresh_token', refreshToken, {
       httpOnly: true,

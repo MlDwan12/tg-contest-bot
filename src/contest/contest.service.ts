@@ -37,8 +37,7 @@ export class ContestService {
     private readonly _cronService: CronService,
     private readonly _contestParticipationService: ContestParticipationService,
     private readonly _userService: UsersService,
-  ) {
-  }
+  ) {}
 
   private readonly channels = '-1002949180383';
 
@@ -100,14 +99,14 @@ export class ContestService {
 
     const allowedChannels = dto.allowedGroups
       ? await this._channelService.findMany(
-        dto.allowedGroups.split(',').map(String),
-      )
+          dto.allowedGroups.split(',').map(String),
+        )
       : [];
 
     const requiredChannels = dto.requiredGroups
       ? await this._channelService.findMany(
-        dto.requiredGroups.split(',').map(String),
-      )
+          dto.requiredGroups.split(',').map(String),
+        )
       : [];
 
     const creator = await this._adminService.findOne({ id: dto.creatorId });
@@ -199,7 +198,10 @@ export class ContestService {
   async updateContest(id: number, dto: UpdateContestDto): Promise<any> {
     this.logger.log(`Обновление конкурса id=${id}`);
 
-    const contest = await this.contestRepo.findOne({ where: { id }, relations: {participants: true} });
+    const contest = await this.contestRepo.findOne({
+      where: { id },
+      relations: { participants: true },
+    });
     if (!contest) {
       this.logger.error(`Конкурс id=${id} не найден`);
       throw new NotFoundException('Contest not found');
@@ -249,7 +251,7 @@ export class ContestService {
     }
 
     // Сохраняем сам конкурс (без cascade на winners)
-    const updated = await this.contestRepo.save(contest);
+    await this.contestRepo.save(contest);
 
     this.logger.log(`Конкурс id=${id} успешно обновлён`);
 
@@ -314,7 +316,9 @@ export class ContestService {
       where: { id: constestId },
       relations: {
         participants: { user: true, contest: { requiredGroups: true } },
-        winners: { user: { participations: { contest: { requiredGroups: true } } } },
+        winners: {
+          user: { participations: { contest: { requiredGroups: true } } },
+        },
       },
     });
     console.log('1231231231231231231===>', contest);
@@ -329,7 +333,6 @@ export class ContestService {
       winners = contest.winners.flatMap((e) => {
         return e.user.participations
           .map((p) => {
-            console.log(p);
             if (p.contest.id === constestId) return p.id;
           })
           .filter((p) => p !== undefined);
@@ -359,7 +362,6 @@ export class ContestService {
       }
 
       this.logger.debug(`Поиск постов если уже опубликовано`);
-      this.logger.debug(`CONTEST=======>`, contest);
 
       if (contest.imageUrl) {
         const filePath = join(process.cwd(), contest.imageUrl); // contest.imageUrl типа "/uploads/123.png"
