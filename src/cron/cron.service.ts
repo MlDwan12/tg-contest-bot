@@ -20,10 +20,12 @@ import { TelegramService } from 'src/telegram/telegram.service';
 import { ContestParticipationService } from 'src/contest-participation/contest-participation.service';
 import { Telegraf } from 'telegraf';
 import { InjectBot } from 'nestjs-telegraf';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class CronService {
   private readonly logger = new Logger(CronService.name);
+  private readonly adminIds: string[];
 
   constructor(
     private readonly schedulerRegistry: SchedulerRegistry,
@@ -34,7 +36,13 @@ export class CronService {
     private _telegramService: TelegramService,
     private _contestParticipationService: ContestParticipationService,
     @InjectBot() private readonly bot: Telegraf<any>,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.adminIds = this.configService
+      .get<string>('ADMIN_IDS')!
+      .split(',')
+      .map((id) => id.trim());
+  }
 
   async createTaskInDb(task: {
     type: ScheduledTaskType;
@@ -128,11 +136,15 @@ export class CronService {
         const telegramMessageIds: string[] = [];
 
         if (task.type === ScheduledTaskType.POST_PUBLISH) {
+          const channelsName = contest.requiredGroups
+            .map((e) => `@${e.telegramName}`)
+            .join('\n\n');
+
           await Promise.all(
             channels.map(async (channel) => {
               const telegramMessageId = await this._telegramService.sendPosts(
                 channel.telegramId,
-                `${contest.name}\n\n${contest.description}`,
+                `${contest.name}\n\n${contest.description}\n\n${channelsName}`,
                 contest.imageUrl,
                 contest.id,
                 channel.telegramId,
@@ -156,26 +168,15 @@ export class CronService {
             this.logger.log(`Конкурс ${contest.id} активирован`);
           }
         } else if (task.type === ScheduledTaskType.CONTEST_FINISH) {
+          this.logger.log(`Запуск завершения конкурса ${contest.id}`);
+          const channelsName = contest.allowedGroups
+            .map((e) => `@${e.telegramName}`)
+            .join('\n\n');
+
           contest.status = 'completed';
           await this.contestService.saveContest(contest);
-          this.logger.log(`Конкурс ${contest.id} завершен`);
-
-          for (const msgId of contest.telegramMessageIds ?? []) {
-            if (msgId) {
-              await this._telegramService.editPost(
-                msgId.split(':')[0],
-                Number(msgId.split(':')[1]),
-                contest,
-                undefined,
-                undefined,
-                undefined,
-                'Узнать результат',
-              );
-            }
-          }
 
           const winners = await this.contestService.getWinners(contest.id);
-          console.log('WINNERS===>', winners);
 
           if (winners.length) {
             await Promise.all(
@@ -200,6 +201,10 @@ export class CronService {
                       msgId.split(':')[0],
                       Number(msgId.split(':')[1]),
                       contest,
+                      undefined,
+                      undefined,
+                      undefined,
+                      'Узнать результат',
                     );
                   }
                 }
@@ -212,6 +217,21 @@ export class CronService {
                 );
               }),
             );
+
+            for (const adminId of this.adminIds) {
+              await this._telegramService.sendPrivateMessage(
+                adminId,
+                `Завершен конкурс: ${contest.name}\n\nГруппы, которые участвовали в розыгрыше:\n\n${channelsName}`,
+              );
+            }
+            this.logger.log(`Конкурс ${contest.id} завершен`);
+          } else {
+            for (const adminId of this.adminIds) {
+              await this._telegramService.sendPrivateMessage(
+                adminId,
+                `Произошла ошибка при завершен конкурса: ${contest.name}\n\nНужно завершить конкурс в ручную, через админ панель.`,
+              );
+            }
           }
         }
 

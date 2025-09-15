@@ -18,6 +18,9 @@ import { ScheduledTaskType } from 'src/cron/entities/cron.entity';
 import { UsersService } from 'src/users/users.service';
 import { ContestParticipationService } from 'src/contest-participation/contest-participation.service';
 import { ContestWinner } from './entities/contest_winners.entity';
+import { join } from 'path';
+import { promises as fs } from 'fs';
+import { ContestParticipation } from 'src/contest-participation/entities/contest-participation.entity';
 
 @Injectable()
 export class ContestService {
@@ -34,7 +37,8 @@ export class ContestService {
     private readonly _cronService: CronService,
     private readonly _contestParticipationService: ContestParticipationService,
     private readonly _userService: UsersService,
-  ) {}
+  ) {
+  }
 
   private readonly channels = '-1002949180383';
 
@@ -96,14 +100,14 @@ export class ContestService {
 
     const allowedChannels = dto.allowedGroups
       ? await this._channelService.findMany(
-          dto.allowedGroups.split(',').map(String),
-        )
+        dto.allowedGroups.split(',').map(String),
+      )
       : [];
 
     const requiredChannels = dto.requiredGroups
       ? await this._channelService.findMany(
-          dto.requiredGroups.split(',').map(String),
-        )
+        dto.requiredGroups.split(',').map(String),
+      )
       : [];
 
     const creator = await this._adminService.findOne({ id: dto.creatorId });
@@ -192,10 +196,10 @@ export class ContestService {
     return savedContest;
   }
 
-  async updateContest(id: number, dto: UpdateContestDto): Promise<Contest> {
+  async updateContest(id: number, dto: UpdateContestDto): Promise<any> {
     this.logger.log(`Обновление конкурса id=${id}`);
 
-    const contest = await this.contestRepo.findOne({ where: { id } });
+    const contest = await this.contestRepo.findOne({ where: { id }, relations: {participants: true} });
     if (!contest) {
       this.logger.error(`Конкурс id=${id} не найден`);
       throw new NotFoundException('Contest not found');
@@ -208,37 +212,43 @@ export class ContestService {
     );
 
     // Если нужно обновить посты в телеграме
+    console.log('TEST ======> ', contest.telegramMessageIds);
     if (dto.description || dto.buttonText || dto.name || dto.imageUrl) {
       for (const msgId of contest.telegramMessageIds ?? []) {
         if (!msgId) continue;
-
+        console.log('MSG_ID ====> ', msgId);
         const [chatId, messageId] = msgId.split(':');
         await this._telegramPostService.editPost(
           chatId,
           Number(messageId),
           contest,
-          contest.name,
-          contest.description,
-          contest.imageUrl ?? undefined,
-          contest.buttonText,
+          dto.name ?? undefined,
+          dto.description ?? undefined,
+          dto.imageUrl ?? undefined,
+          dto.buttonText ?? undefined,
         );
       }
     }
 
+    console.log('{WINERS} ==== ', dto.winners);
     if (dto.winners) {
-      contest.winners = await Promise.all(
+      // Сохраняем победителей вручную через репозиторий
+      const winners = await Promise.all(
         dto.winners.split(',').map(async (userId) => {
           const winner = new ContestWinner();
           winner.user = await this._userService.findOrCreate({
             telegramId: Number(userId),
           });
-          // winner.contest = contest;
-          return winner;
+          winner.contest = contest; // обязательно указываем ссылку на конкурс
+          return this.contestWinnerRepo.save(winner); // сохраняем и возвращаем
         }),
       );
-    }
-    this.logger.log(`Добавлены победители ${JSON.stringify(contest.winners)}`);
 
+      // Обновляем relation вручную (без cascade)
+      contest.winners = winners;
+    }
+
+    // Сохраняем сам конкурс (без cascade на winners)
     const updated = await this.contestRepo.save(contest);
 
     this.logger.log(`Конкурс id=${id} успешно обновлён`);
@@ -275,7 +285,12 @@ export class ContestService {
       this.logger.debug(`Таска записана в бд`);
     }
 
-    return updated;
+    const res = await this.contestRepo.findOne({
+      where: { id: contest.id },
+      relations: ['winners', 'winners.user'], // подгружаем победителей и их пользователей
+    });
+
+    return res;
   }
 
   async myContest(id: string, chatId: string) {
@@ -298,18 +313,17 @@ export class ContestService {
     const contest = await this.contestRepo.findOne({
       where: { id: constestId },
       relations: {
-        participants: { user: true },
-        winners: { user: { participations: { contest: true } } },
+        participants: { user: true, contest: { requiredGroups: true } },
+        winners: { user: { participations: { contest: { requiredGroups: true } } } },
       },
     });
+    console.log('1231231231231231231===>', contest);
 
     if (!contest) {
       this.logger.error(`Конкурс id=${constestId} не найден`);
       throw new HttpException('конкурс не найден', HttpStatus.NOT_FOUND);
     }
     let winners: number[] = [];
-    console.log(1231231231231, contest.winners);
-    console.log(1231231231232, contest.winners);
 
     if (contest.winners?.length) {
       winners = contest.winners.flatMap((e) => {
@@ -321,10 +335,8 @@ export class ContestService {
           .filter((p) => p !== undefined);
       });
     }
-    console.log(123, winners);
-
     if (contest.participants && !contest.winners.length) {
-      const randomElements = this.getRandomElement(
+      const randomElements = await this.getRandomElement(
         contest.participants,
         contest.prizePlaces,
       );
@@ -348,6 +360,20 @@ export class ContestService {
 
       this.logger.debug(`Поиск постов если уже опубликовано`);
       this.logger.debug(`CONTEST=======>`, contest);
+
+      if (contest.imageUrl) {
+        const filePath = join(process.cwd(), contest.imageUrl); // contest.imageUrl типа "/uploads/123.png"
+        try {
+          await fs.unlink(filePath);
+          this.logger.log(`Картинка конкурса удалена: ${filePath}`);
+        } catch (err) {
+          if (err.code !== 'ENOENT') {
+            this.logger.warn(`Не удалось удалить картинку: ${filePath}`, err);
+          } else {
+            this.logger.debug(`Картинка уже отсутствует: ${filePath}`);
+          }
+        }
+      }
 
       const posts = contest.telegramMessageIds?.map((e) => {
         const [chatId, messageId] = e.split(':');
@@ -446,16 +472,31 @@ export class ContestService {
     return telegramMessageIds;
   }
 
-  private getRandomElement<T>(arr: T[], count: number): T[] {
+  private async getRandomElement(
+    arr: ContestParticipation[],
+    count: number,
+  ): Promise<ContestParticipation[]> {
     this.logger.log(`Выбор случайных элементов (${count}) из массива`);
     if (!arr || arr.length === 0 || count <= 0) return [];
-    const result: T[] = [];
+    const result: ContestParticipation[] = [];
     const usedIndices = new Set<number>();
     const n = Math.min(count, arr.length);
 
     while (result.length < n) {
       const randomIndex = Math.floor(Math.random() * arr.length);
-      if (!usedIndices.has(randomIndex)) {
+      console.log('1 Проверка подписок ===', arr[randomIndex]);
+      console.log('2 Проверка подписок ===', arr[randomIndex].contest);
+
+      const isUnsub = (
+        await this._telegramPostService.isUserSubscribed(
+          arr[randomIndex].contest.requiredGroups,
+          Number(arr[randomIndex].user.telegramId),
+          false,
+        )
+      ).some((r) => !r.subscribed);
+      console.log('Отписался от чего-то', isUnsub);
+
+      if (!usedIndices.has(randomIndex) && !isUnsub) {
         usedIndices.add(randomIndex);
         result.push(arr[randomIndex]);
       }

@@ -28,10 +28,7 @@ export class Contest {
   @Column({ type: 'enum', enum: ['random', 'manual'], default: 'random' })
   winnerStrategy: 'random' | 'manual';
 
-  // @OneToMany(() => ContestWinner, (w) => w.contest)
-  // winners: ContestWinner[];
-
-  @OneToMany(() => ContestWinner, (w) => w.contest)
+  @OneToMany(() => ContestWinner, (w) => w.contest, { cascade: true })
   winners: ContestWinner[];
 
   @OneToMany(() => ContestParticipation, (p) => p.contest)
