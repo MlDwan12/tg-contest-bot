@@ -11,7 +11,7 @@ import { forwardRef, Module } from '@nestjs/common';
   imports: [
     TypeOrmModule.forFeature([ScheduledTask]),
     forwardRef(() => ContestModule),
-    TelegramModule,
+    forwardRef(() => TelegramModule),
     forwardRef(() => ContestParticipationModule),
   ],
   controllers: [CronController],

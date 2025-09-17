@@ -1,22 +1,66 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger } from '@nestjs/common';
 import * as cookieParser from 'cookie-parser';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
+import * as basicAuth from 'express-basic-auth';
+import { TelegramService } from './telegram/telegram.service';
+import { DataSource } from 'typeorm';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const logger = new Logger('Bootstrap');
+
+  // Helmet first
+  app.use(helmet());
+
+  // Cookie parser & trust proxy
+  app.use(cookieParser());
+  app.set('trust proxy', 1);
+
+  // Request logger
   app.use((req, res, next) => {
-    console.log('--- Incoming Request ---');
-    console.log('Protocol:', req.protocol); // http или https
-    console.log('Headers X-Forwarded-Proto:', req.headers['x-forwarded-proto']);
-    console.log('Secure:', req.secure); // true, если https
-    console.log('Host:', req.headers.host);
-    console.log('Cookies:', req.headers.cookie);
-    console.log('-------------------------');
+    logger.log(`${req.method} ${req.originalUrl}`, 'IncomingRequest');
     next();
   });
 
+  // Swagger Basic Auth
+  const swaggerUser = process.env.SWAGGER_USER;
+  const swaggerPassword = process.env.SWAGGER_PASSWORD;
+  if (!swaggerUser || !swaggerPassword) {
+    throw new Error('SWAGGER_USER and SWAGGER_PASSWORD must be defined');
+  }
+
+  app.use(
+    ['/api/docs', '/api/docs-json'],
+    basicAuth({
+      challenge: true,
+      users: { [swaggerUser]: swaggerPassword },
+    }),
+  );
+
+  // Swagger config
+  const config = new DocumentBuilder()
+    .setTitle('RollCube API')
+    .setDescription('Документация REST API для RollCube')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .addCookieAuth('accessTokenCookie', {
+      type: 'apiKey',
+      in: 'cookie',
+      name: 'accessToken',
+      description: 'JWT access token cookie',
+    })
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api/docs', app, document, {
+    swaggerOptions: { persistAuthorization: true },
+  });
+
+  // Global validation
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -25,21 +69,35 @@ async function bootstrap() {
     }),
   );
 
-  app.set('trust proxy', 1);
-  app.use(cookieParser());
-
+  // CORS
   app.enableCors({
-    origin: [
-      'https://www.rollcube.ru',
-      'http://localhost:8945',
-      'https://rollcube.ru',
-      'https://d68dv7gb-3000.euw.devtunnels.ms/',
-    ],
+    origin: process.env.CORS_ORIGINS?.split(',') ?? ['https://rollcube.ru'],
     credentials: true,
     exposedHeaders: ['set-cookie'],
   });
 
-  await app.listen(process.env.PORT ?? 3000);
+  const port = process.env.PORT ?? 3000;
+  const domain = process.env.DOMAIN ?? 'http://localhost';
+
+  try {
+    // Проверка БД
+    const dataSource = app.get(DataSource);
+    await dataSource.query('SELECT 1');
+    logger.log('✅ Database connected', 'Bootstrap');
+
+    // Проверка Telegram-бота
+    const telegramService = app.get(TelegramService);
+    await telegramService.checkHealth();
+    logger.log('✅ Telegram bot ready', 'Bootstrap');
+  } catch (error) {
+    logger.error(`❌ Startup check failed: ${error.message}`, error.stack);
+    process.exit(1); // ⚡ Заваливаем приложение, если критическая ошибка
+  }
+
+  // --- Запуск сервера ---
+  await app.listen(port);
+  logger.log(`🚀 Server running on ${domain}:${port}`);
+  logger.log(`📖 Swagger docs: ${domain}:${port}/api/docs`);
 }
 
 void bootstrap();

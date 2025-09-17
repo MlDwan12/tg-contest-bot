@@ -10,9 +10,9 @@ import { TelegramModule } from 'src/telegram/telegram.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([ContestParticipation]),
-    UsersModule,
+    forwardRef(() => TelegramModule),
     forwardRef(() => ContestModule),
-    TelegramModule,
+    forwardRef(() => UsersModule),
   ],
   controllers: [ContestParticipationController],
   providers: [ContestParticipationService],

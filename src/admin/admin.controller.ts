@@ -11,13 +11,17 @@ import {
 import { AdminService } from './admin.service';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { UsersService } from 'src/users/users.service';
 
 @UseGuards(JwtAuthGuard)
 @Controller('admin')
 export class AdminController {
   private readonly logger = new Logger(AdminController.name);
 
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly userService: UsersService,
+  ) {}
 
   @Post()
   async create(@Body() createAdminDto: CreateAdminDto) {
@@ -25,6 +29,12 @@ export class AdminController {
       `Создание администратора: ${JSON.stringify(createAdminDto)}`,
     );
     return this.adminService.create(createAdminDto);
+  }
+
+  @Post('broadcast')
+  async broadcast(@Body() data: any) {
+    this.logger.log(`Отправка рассылки на конкурс`);
+    return this.userService.broadcast(data);
   }
 
   @Get()

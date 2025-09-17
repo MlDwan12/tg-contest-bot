@@ -34,7 +34,6 @@ export class CronService {
     @Inject(forwardRef(() => ContestService))
     private contestService: ContestService,
     private _telegramService: TelegramService,
-    private _contestParticipationService: ContestParticipationService,
     @InjectBot() private readonly bot: Telegraf<any>,
     private readonly configService: ConfigService,
   ) {

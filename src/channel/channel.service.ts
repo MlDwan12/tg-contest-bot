@@ -120,6 +120,10 @@ export class ChannelService {
     }
   }
 
+  async findOneByName(name: string) {
+    return this.channelRepository.findOne({ where: { name } });
+  }
+
   async remove(telegramId: string): Promise<void> {
     try {
       this.logger.warn(`Удаление канала telegramId=${telegramId}`);

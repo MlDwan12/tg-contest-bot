@@ -14,14 +14,12 @@ import { UsersModule } from 'src/users/users.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Contest, ContestWinner]),
-    ContestParticipationModule,
-    ChannelModule,
+    forwardRef(() => ContestParticipationModule),
+    forwardRef(() => ChannelModule),
     AdminModule,
     forwardRef(() => TelegramModule),
     forwardRef(() => CronModule),
-    forwardRef(() => CronModule),
-    UsersModule,
-    forwardRef(() => ContestParticipationModule),
+    forwardRef(() => UsersModule),
   ],
   controllers: [ContestController],
   providers: [ContestService],

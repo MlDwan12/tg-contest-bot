@@ -1,6 +1,8 @@
 import {
+  forwardRef,
   HttpException,
   HttpStatus,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -35,7 +37,9 @@ export class ContestService {
     private readonly _channelService: ChannelService,
     private readonly _adminService: AdminService,
     private readonly _cronService: CronService,
+    @Inject(forwardRef(() => ContestParticipationService))
     private readonly _contestParticipationService: ContestParticipationService,
+    @Inject(forwardRef(() => UsersService))
     private readonly _userService: UsersService,
   ) {}
 

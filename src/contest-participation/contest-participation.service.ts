@@ -24,8 +24,7 @@ export class ContestParticipationService {
     private readonly telegramService: TelegramService,
     @Inject(forwardRef(() => ContestService))
     private contestService: ContestService,
-  ) {
-  }
+  ) {}
 
   async registerParticipation(
     user: User,
@@ -161,5 +160,12 @@ export class ContestParticipationService {
       `Обновление победителей завершено, участников обновлено: ${updated.length}`,
     );
     return updated;
+  }
+
+  async getAllByGroupId(groupId: string) {
+    return this.participationRepo.find({
+      where: { groupId: Number(groupId) },
+      relations: { user: true },
+    });
   }
 }
