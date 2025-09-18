@@ -1,14 +1,12 @@
 import {
-  forwardRef,
   HttpException,
   HttpStatus,
-  Inject,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThanOrEqual, Repository } from 'typeorm';
+import { DataSource, LessThanOrEqual, Repository } from 'typeorm';
 import { Contest } from './entities/contest.entity';
 import { CreateContestDto } from './dto/create-contest.dto';
 import { TelegramService } from 'src/telegram/telegram.service';
@@ -25,8 +23,8 @@ import { promises as fs } from 'fs';
 import { ContestParticipation } from 'src/contest-participation/entities/contest-participation.entity';
 
 @Injectable()
-export class ContestService {
-  private readonly logger = new Logger(ContestService.name);
+export class ContestServiceV2 {
+  private readonly logger = new Logger(ContestServiceV2.name);
 
   constructor(
     @InjectRepository(Contest)
@@ -37,18 +35,10 @@ export class ContestService {
     private readonly _channelService: ChannelService,
     private readonly _adminService: AdminService,
     private readonly _cronService: CronService,
-    @Inject(forwardRef(() => ContestParticipationService))
     private readonly _contestParticipationService: ContestParticipationService,
-    @Inject(forwardRef(() => UsersService))
     private readonly _userService: UsersService,
+    private readonly dataSource: DataSource,
   ) {}
-
-  private readonly channels = '-1002949180383';
-
-  getChannels() {
-    this.logger.log('Возвращаю список каналов');
-    return this.channels;
-  }
 
   async getScheduledContests(now: Date): Promise<Contest[]> {
     this.logger.log(`Поиск запланированных конкурсов на дату: ${now}`);
@@ -101,19 +91,16 @@ export class ContestService {
   async createContest(dto: CreateContestDto): Promise<Contest> {
     this.logger.log(`Создание нового конкурса: ${dto.name}`);
 
-    const allowedChannels = dto.allowedGroups
-      ? await this._channelService.findMany(
-          dto.allowedGroups.split(',').map(String),
-        )
-      : [];
+    const [allowedChannels, requiredChannels, creator] = await Promise.all([
+      dto.allowedGroups
+        ? this._channelService.findMany(dto.allowedGroups.split(','))
+        : [],
+      dto.requiredGroups
+        ? this._channelService.findMany(dto.requiredGroups.split(','))
+        : [],
+      this._adminService.findOne({ id: dto.creatorId }),
+    ]);
 
-    const requiredChannels = dto.requiredGroups
-      ? await this._channelService.findMany(
-          dto.requiredGroups.split(',').map(String),
-        )
-      : [];
-
-    const creator = await this._adminService.findOne({ id: dto.creatorId });
     if (!creator) {
       this.logger.error(
         `Не найден админ с id=${dto.creatorId}, создание конкурса прервано`,
@@ -125,17 +112,17 @@ export class ContestService {
     }
 
     this.logger.debug(
-      `StartDate DTO: ${dto.startDate}, parsed: ${dto.startDate ? new Date(dto.startDate) : 'N/A'}`,
+      `StartDate DTO: ${dto.startDate}, parsed: ${dto.startDate ? dto.startDate : 'N/A'}`,
     );
 
-    const contest = this.contestRepo.create({
+    const savedContest = await this.contestRepo.save({
       name: dto.name,
       description: dto.description,
       winnerStrategy: dto.winnerStrategy ?? 'random',
       allowedGroups: allowedChannels,
       requiredGroups: requiredChannels,
-      startDate: dto.startDate ? new Date(dto.startDate) : new Date(),
-      endDate: new Date(dto.endDate),
+      startDate: dto.startDate ? dto.startDate : new Date(),
+      endDate: dto.endDate,
       prizePlaces: dto.prizePlaces ?? 1,
       status: dto.startDate ? 'pending' : 'active',
       creator,
@@ -143,7 +130,6 @@ export class ContestService {
       buttonText: dto.buttonText.trim() ? dto.buttonText : 'Участвовать',
     });
 
-    const savedContest = await this.contestRepo.save(contest);
     this.logger.log(`✅ Конкурс создан, id=${savedContest.id}`);
 
     if (savedContest.allowedGroups?.length && !dto.startDate) {
@@ -206,8 +192,8 @@ export class ContestService {
 
     const contest = await this.contestRepo.findOne({
       where: { id },
-      relations: { participants: true },
     });
+
     if (!contest) {
       this.logger.error(`Конкурс id=${id} не найден`);
       throw new NotFoundException('Contest not found');
@@ -219,44 +205,42 @@ export class ContestService {
       `Поля для обновления: ${JSON.stringify(dto)} | Конкурс id=${id}`,
     );
 
-    // Если нужно обновить посты в телеграме
-    console.log('TEST ======> ', contest.telegramMessageIds);
     if (dto.description || dto.buttonText || dto.name || dto.imageUrl) {
-      for (const msgId of contest.telegramMessageIds ?? []) {
-        if (!msgId) continue;
-        console.log('MSG_ID ====> ', msgId);
-        const [chatId, messageId] = msgId.split(':');
-        await this._telegramPostService.editPost(
-          chatId,
-          Number(messageId),
-          contest,
-          dto.name ?? undefined,
-          dto.description ?? undefined,
-          dto.imageUrl ?? undefined,
-          dto.buttonText ?? undefined,
-        );
-      }
-    }
-
-    console.log('{WINERS} ==== ', dto.winners);
-    if (dto.winners) {
-      // Сохраняем победителей вручную через репозиторий
-      const winners = await Promise.all(
-        dto.winners.split(',').map(async (userId) => {
-          const winner = new ContestWinner();
-          winner.user = await this._userService.findOrCreate({
-            telegramId: Number(userId),
-          });
-          winner.contest = contest; // обязательно указываем ссылку на конкурс
-          return this.contestWinnerRepo.save(winner); // сохраняем и возвращаем
+      await Promise.all(
+        (contest.telegramMessageIds ?? []).map(async (msgId) => {
+          if (!msgId) return;
+          const [chatId, messageId] = msgId.split(':');
+          await this._telegramPostService.editPost(
+            chatId,
+            Number(messageId),
+            contest,
+            dto.name,
+            dto.description,
+            dto.imageUrl,
+            dto.buttonText,
+          );
         }),
       );
-
-      // Обновляем relation вручную (без cascade)
-      contest.winners = winners;
     }
 
-    // Сохраняем сам конкурс (без cascade на winners)
+    if (dto.winners) {
+      await this.dataSource.transaction(async (manager) => {
+        const winners: ContestWinner[] = [];
+        for (const userId of dto
+          .winners!.split(',')
+          .map((u) => u.trim())
+          .filter(Boolean)) {
+          const user = await this._userService.findOrCreate({
+            telegramId: Number(userId),
+          });
+          const winner = manager.create(ContestWinner, { user, contest });
+          winners.push(await manager.save(winner));
+        }
+        contest.winners = winners;
+        await manager.save(contest);
+      });
+    }
+
     await this.contestRepo.save(contest);
 
     this.logger.log(`Конкурс id=${id} успешно обновлён`);
@@ -295,7 +279,7 @@ export class ContestService {
 
     const res = await this.contestRepo.findOne({
       where: { id: contest.id },
-      relations: ['winners', 'winners.user'], // подгружаем победителей и их пользователей
+      relations: ['winners', 'winners.user'],
     });
 
     return res;
@@ -492,8 +476,6 @@ export class ContestService {
 
     while (result.length < n) {
       const randomIndex = Math.floor(Math.random() * arr.length);
-      console.log('1 Проверка подписок ===', arr[randomIndex]);
-      console.log('2 Проверка подписок ===', arr[randomIndex].contest);
 
       const isUnsub = (
         await this._telegramPostService.isUserSubscribed(

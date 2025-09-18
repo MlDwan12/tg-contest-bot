@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe, Logger } from '@nestjs/common';
+import { ValidationPipe, VersioningType, Logger } from '@nestjs/common';
 import * as cookieParser from 'cookie-parser';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -93,6 +93,11 @@ async function bootstrap() {
     logger.error(`❌ Startup check failed: ${error.message}`, error.stack);
     process.exit(1); // ⚡ Заваливаем приложение, если критическая ошибка
   }
+
+  app.enableVersioning({
+    type: VersioningType.URI,
+    defaultVersion: '1',
+  });
 
   // --- Запуск сервера ---
   await app.listen(port);
