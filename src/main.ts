@@ -46,7 +46,7 @@ async function bootstrap() {
     .setTitle('RollCube API')
     .setDescription('Документация REST API для RollCube')
     .setVersion('1.0')
-    .addBearerAuth()
+    // .addBearerAuth()
     .addCookieAuth('accessTokenCookie', {
       type: 'apiKey',
       in: 'cookie',
@@ -94,10 +94,10 @@ async function bootstrap() {
     process.exit(1); // ⚡ Заваливаем приложение, если критическая ошибка
   }
 
-  app.enableVersioning({
-    type: VersioningType.URI,
-    defaultVersion: '1',
-  });
+  // app.enableVersioning({
+  //   type: VersioningType.URI,
+  //   defaultVersion: '1',
+  // });
 
   // --- Запуск сервера ---
   await app.listen(port);
