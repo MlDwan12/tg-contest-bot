@@ -113,7 +113,7 @@ export class UsersService {
 
     const users = await this.userRepo
       .createQueryBuilder('user')
-      .select(['user.id', 'user.username'])
+      .select(['user.id', 'user.username', 'user.telegramId'])
       .skip((page - 1) * limit)
       .take(limit)
       .getMany();
@@ -137,6 +137,7 @@ export class UsersService {
       .select([
         'p.id',
         'user.id',
+        'user.telegramId',
         'user.username',
         'c.id',
         'c.name',
@@ -148,9 +149,12 @@ export class UsersService {
 
     const userMap: Record<number, any> = {};
     users.forEach((u) => {
+      console.log(u);
+      
       userMap[u.id] = {
         id: u.id,
         username: u.username,
+        telegramId: u.telegramId,
         groups: {},
         totalParticipations: { count: 0, contests: [] },
       };
@@ -177,6 +181,7 @@ export class UsersService {
     return Object.values(userMap).map((u) => ({
       id: u.id,
       username: u.username,
+      telegramId: u.telegramId,
       totalParticipations: u.totalParticipations,
       groups: Object.entries(u.groups)
         .sort(([, a], [, b]) => (b as number) - (a as number))
@@ -307,7 +312,7 @@ export class UsersService {
           'groupId',
           channels.map((c) => Number(c.telegramId)),
         );
-console.log(users);
+        console.log(users);
 
         const uniqueUsers = Array.from(
           new Map(users.map((u) => [u.user.telegramId, u.user])).values(),
