@@ -1,4 +1,11 @@
-import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
+import {
+  forwardRef,
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { User } from './entities/user.entity';
@@ -7,6 +14,9 @@ import { ContestParticipation } from 'src/contest-participation/entities/contest
 import { TelegramService } from 'src/telegram/telegram.service';
 import { ContestParticipationService } from 'src/contest-participation/contest-participation.service';
 import { ChannelService } from 'src/channel/channel.service';
+import { BroadcastDto } from 'src/admin/dto/broadcastDto';
+import { BroadcastType } from 'src/admin/enums/broadcast.enum';
+import { ContestService } from 'src/contest/contest.service';
 
 @Injectable()
 export class UsersService {
@@ -20,6 +30,7 @@ export class UsersService {
     @Inject(forwardRef(() => ContestParticipationService))
     private readonly _contestParticipationService: ContestParticipationService,
     private readonly _channelService: ChannelService,
+    private readonly _contestService: ContestService,
   ) {}
 
   async findOrCreate(tgUser: CreateUserDto): Promise<User> {
@@ -65,7 +76,20 @@ export class UsersService {
     return user;
   }
 
-  async getAllUsers(
+  async getUserByTgId(
+    telegramId: string,
+  ): Promise<Pick<User, 'id' | 'telegramId' | 'username'> | null> {
+    return this.userRepo.findOne({
+      where: { telegramId },
+      select: ['id', 'telegramId', 'username'],
+    });
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return this.userRepo.find();
+  }
+
+  async getAllUsersPag(
     page = 1,
     limit = 50,
   ): Promise<{ users: User[]; total: number }> {
@@ -160,63 +184,233 @@ export class UsersService {
     }));
   }
 
-  async broadcast(data: {
-    text: string;
-    channelUsername: string;
-    messageId: string;
-  }) {
+  // async broadcast(data: {
+  //   text: string;
+  //   channelUsername: string;
+  //   messageId: string;
+  // }) {
+  //   try {
+  //     this.logger.log(
+  //       `broadcast: начало рассылки channel=${data.channelUsername}`,
+  //     );
+
+  //     const channel = await this._channelService.findOneByName(
+  //       data.channelUsername,
+  //     );
+  //     const users = await this._contestParticipationService.getAllByGroupId(
+  //       channel?.telegramId!,
+  //     );
+
+  //     this.logger.debug(`broadcast: получено пользователей=${users.length}`);
+
+  //     const uniqueUsers = Array.from(
+  //       new Map(users.map((u) => [u.user.telegramId, u])).values(),
+  //     );
+  //     this.logger.log(
+  //       `broadcast: уникальных пользователей=${uniqueUsers.length}`,
+  //     );
+
+  //     // 🔥 параллельная отправка
+  //     const results = await Promise.allSettled(
+  //       uniqueUsers.map((user) =>
+  //         this._telegramService
+  //           .sendPrivateMessage(
+  //             user.user.telegramId,
+  //             data.text,
+  //             data.channelUsername,
+  //             data.messageId,
+  //           )
+  //           .then(() => {
+  //             this.logger.log(
+  //               `Сообщение отправлено пользователю telegramId=${user.user.telegramId}`,
+  //             );
+  //           }),
+  //       ),
+  //     );
+
+  //     const failed = results.filter((r) => r.status === 'rejected').length;
+  //     if (failed > 0) {
+  //       this.logger.warn(`broadcast: не удалось отправить ${failed} сообщения`);
+  //     }
+
+  //     this.logger.log(
+  //       `broadcast: завершено, всего=${uniqueUsers.length}, ошибок=${failed}`,
+  //     );
+  //   } catch (error) {
+  //     this.logger.error(
+  //       `broadcast: критическая ошибка: ${error.message}`,
+  //       error.stack,
+  //     );
+  //   }
+  // }
+
+  async broadcast(dto: BroadcastDto) {
     try {
-      this.logger.log(
-        `broadcast: начало рассылки channel=${data.channelUsername}`,
-      );
+      this.logger.log(`broadcast: старт, параметры=${JSON.stringify(dto)}`);
 
-      const channel = await this._channelService.findOneByName(
-        data.channelUsername,
-      );
-      const users = await this._contestParticipationService.getAllByGroupId(
-        channel?.telegramId!,
-      );
+      let targets: { telegramId: string }[] | number[] = [];
 
-      this.logger.debug(`broadcast: получено пользователей=${users.length}`);
+      const contest = dto.contestId
+        ? await this._contestService.getContestById(dto.contestId)
+        : undefined;
 
-      const uniqueUsers = Array.from(
-        new Map(users.map((u) => [u.user.telegramId, u])).values(),
-      );
-      this.logger.log(
-        `broadcast: уникальных пользователей=${uniqueUsers.length}`,
-      );
+      const channel = dto.channelUsername
+        ? await this._channelService.findOneByName(dto.channelUsername)
+        : null;
 
-      // 🔥 параллельная отправка
-      const results = await Promise.allSettled(
-        uniqueUsers.map((user) =>
-          this._telegramService
-            .sendPrivateMessage(
-              user.user.telegramId,
-              data.text,
-              data.channelUsername,
-              data.messageId,
-            )
-            .then(() => {
-              this.logger.log(
-                `Сообщение отправлено пользователю telegramId=${user.user.telegramId}`,
-              );
-            }),
-        ),
-      );
+      const channelName = channel ? channel.telegramName : undefined;
 
-      const failed = results.filter((r) => r.status === 'rejected').length;
-      if (failed > 0) {
-        this.logger.warn(`broadcast: не удалось отправить ${failed} сообщения`);
+      const messageId = contest?.telegramMessageIds
+        ?.find((msg) => msg.split(':')[0] === channel?.telegramId)
+        ?.split(':')[1];
+
+      if (dto.type === BroadcastType.USER) {
+        // 🔹 одному пользователю
+        if (!dto.userTgId) {
+          throw new HttpException(
+            'Не указали id пользователя',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+        const user = await this.getUserByTgId(dto.userTgId);
+
+        if (!user) {
+          this.logger.warn(`broadcast: пользователь ${dto.userTgId} не найден`);
+          return { success: false, message: 'User not found' };
+        }
+
+        await this._telegramService.sendPrivateMessage(
+          user.telegramId,
+          dto.text,
+          channelName,
+          messageId,
+        );
+        targets = [{ telegramId: user.telegramId }];
+        this.logger.log(`broadcast: режим=USER, userId=${user.telegramId}`);
       }
 
-      this.logger.log(
-        `broadcast: завершено, всего=${uniqueUsers.length}, ошибок=${failed}`,
-      );
+      if (dto.type === BroadcastType.GROUP) {
+        // 🔹 всем участникам группы
+        const channels = await this._channelService.findManyByColumn(
+          'telegramName',
+          dto.channels!,
+        );
+
+        if (!channels) {
+          this.logger.warn(
+            `broadcast: группы с именами: ${dto.channels?.join(', ')} не найден`,
+          );
+          return { success: false, message: 'Channels not found' };
+        }
+
+        const users = await this._contestParticipationService.findManyByColumn(
+          'groupId',
+          channels.map((c) => Number(c.telegramId)),
+        );
+console.log(users);
+
+        const uniqueUsers = Array.from(
+          new Map(users.map((u) => [u.user.telegramId, u.user])).values(),
+        );
+
+        targets = uniqueUsers.map((u) => Number(u.telegramId));
+
+        const checkedUsers = await this._telegramService.areUsersSubscribed(
+          targets,
+          channels,
+        );
+
+        await Promise.all(
+          checkedUsers
+            .filter((u) => u.subscribedToAtLeastOne)
+            .map((u) =>
+              this._telegramService
+                .sendPrivateMessage(
+                  u.telegramId,
+                  dto.text,
+                  channelName,
+                  messageId,
+                )
+                .then(() => {
+                  this.logger.log(
+                    `Сообщение отправлено пользователю telegramId=${u.telegramId}`,
+                  );
+                }),
+            ),
+        );
+
+        this.logger.log(
+          `broadcast: режим=GROUP, group=${dto.channelUsername}, пользователей=${targets.length}`,
+        );
+      }
+
+      if (dto.type === BroadcastType.ALL) {
+        // 🔹 всем пользователям
+        const allUsers = await this.getAllUsers();
+        const channels = await this._channelService.findAll();
+        const userIds = allUsers.map((u) => Number(u.telegramId));
+
+        const checkedUsers = await this._telegramService.areUsersSubscribed(
+          userIds,
+          channels,
+        );
+
+        const targets = await Promise.all(
+          checkedUsers
+            .filter((u) => u.subscribedToAtLeastOne)
+            .map(async (u) => {
+              await this._telegramService.sendPrivateMessage(
+                u.telegramId,
+                dto.text,
+                channelName,
+                messageId,
+              );
+              this.logger.log(
+                `Сообщение отправлено пользователю telegramId=${u.telegramId}`,
+              );
+              return u.telegramId; // возвращаем telegramId из промиса
+            }),
+        );
+
+        // теперь targets — это массив всех отправленных telegramId
+        this.logger.log(
+          `Сообщения отправлены пользователям: ${targets.join(',')}`,
+        );
+        this.logger.log(
+          `broadcast: режим=ALL, пользователей=${targets.length}`,
+        );
+      }
+
+      // 🔥 параллельная отправка
+      // const results = await Promise.allSettled(
+      //   targets.map((t) =>
+      //     this._telegramService
+      //       .sendPrivateMessage(
+      //         t.telegramId,
+      //         dto.text,
+      //         dto.channelUsername,
+      //         dto.messageId,
+      //       )
+      //       .then(() =>
+      //         this.logger.log(
+      //           `Сообщение отправлено пользователю telegramId=${t.telegramId}`,
+      //         ),
+      //       ),
+      //   ),
+      // );
+
+      // const failed = results.filter((r) => r.status === 'rejected').length;
+      // this.logger.log(
+      //   `broadcast: завершено, всего=${targets.length}, ошибок=${failed}`,
+      // );
+
+      return { success: true, total: targets.length };
     } catch (error) {
       this.logger.error(
         `broadcast: критическая ошибка: ${error.message}`,
         error.stack,
       );
+      throw error;
     }
   }
 }

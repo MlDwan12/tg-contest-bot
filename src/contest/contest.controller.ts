@@ -41,7 +41,7 @@ export class ContestController {
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard)
   @UseInterceptors(
     FileInterceptor('image', {
       storage: diskStorage({
@@ -77,7 +77,7 @@ export class ContestController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard)
   @UseInterceptors(
     FileInterceptor('image', {
       storage: diskStorage({
@@ -105,13 +105,13 @@ export class ContestController {
   }
 
   @Patch(':id/complete')
-  @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard)
   async complete(@Param('id', ParseIntPipe) id: number) {
     return await this.contestService.completeContest(id);
   }
 
   @Patch(':id/cancel')
-  @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard)
   async cancel(@Param('id', ParseIntPipe) id: number) {
     return await this.contestService.cancelContest(id);
   }

@@ -6,6 +6,7 @@ import { User } from './entities/user.entity';
 import { ChannelModule } from 'src/channel/channel.module';
 import { TelegramModule } from 'src/telegram/telegram.module';
 import { ContestParticipationModule } from 'src/contest-participation/contest-participation.module';
+import { ContestModule } from 'src/contest/contest.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { ContestParticipationModule } from 'src/contest-participation/contest-pa
     forwardRef(() => TelegramModule),
     forwardRef(() => ChannelModule),
     forwardRef(() => ContestParticipationModule),
+    ContestModule,
   ],
   controllers: [UsersController],
   providers: [UsersService],

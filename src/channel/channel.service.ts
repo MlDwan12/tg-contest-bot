@@ -123,6 +123,14 @@ export class ChannelService {
   async findOneByName(name: string) {
     return this.channelRepository.findOne({ where: { name } });
   }
+  //если все ок то то что выше убрать
+  async findManyByColumn<K extends keyof Channel>(
+    column: K,
+    values: Channel[K][],
+  ): Promise<Channel[]> {
+    const whereClause = { [column]: In(values as any) } as Record<K, any>;
+    return this.channelRepository.find({ where: whereClause });
+  }
 
   async remove(telegramId: string): Promise<void> {
     try {

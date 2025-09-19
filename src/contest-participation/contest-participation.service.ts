@@ -168,4 +168,15 @@ export class ContestParticipationService {
       relations: { user: true },
     });
   }
+
+  async findManyByColumn<K extends keyof ContestParticipation>(
+    column: K,
+    values: ContestParticipation[K][],
+  ): Promise<ContestParticipation[]> {
+    const whereClause = { [column]: In(values as any) } as Record<K, any>;
+    return this.participationRepo.find({
+      where: whereClause,
+      relations: { user: true },
+    });
+  }
 }

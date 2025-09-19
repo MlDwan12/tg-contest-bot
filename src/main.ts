@@ -13,8 +13,21 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const logger = new Logger('Bootstrap');
 
-  // Helmet first
-  app.use(helmet());
+  // 🛡️ Helmet, но "лайтовый" режим, поменять для прода
+  if (process.env.NODE_ENV === 'production') {
+    app.use(
+      helmet({
+        contentSecurityPolicy: { useDefaults: true },
+      }),
+    );
+  } else {
+    app.use(
+      helmet({
+        contentSecurityPolicy: false,
+        crossOriginEmbedderPolicy: false,
+      }),
+    );
+  }
 
   // Cookie parser & trust proxy
   app.use(cookieParser());

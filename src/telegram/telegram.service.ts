@@ -16,12 +16,22 @@ import {
 } from 'telegraf/typings/core/types/typegram';
 import { Channel } from 'src/channel/entities/channel.entity';
 import { Contest } from 'src/contest/entities/contest.entity';
-import path from 'path';
 import { UsersService } from 'src/users/users.service';
-// import path from 'path';
 
 type TextMessage = Message.TextMessage;
 type PhotoMessage = Message.PhotoMessage;
+
+interface SubscriptionDetail {
+  chat: string;
+  subscribed: boolean;
+}
+
+interface SubscriptionResult {
+  telegramId: number;
+  subscribedToAtLeastOne: boolean;
+  details: SubscriptionDetail[];
+  notSubscribedChats: string[];
+}
 
 @Injectable()
 export class TelegramService {
@@ -49,7 +59,8 @@ export class TelegramService {
       `Отправка постов в чаты: ${chatIdsArray.join(', ')}, contestId=${contestId}, groupId=${groupId}`,
     );
 
-    const webAppUrl = `https://t.me/my_test_contest_bot/apprandom?startapp=${groupId}_${contestId}`;
+    const webAppUrl = `${process.env.MINI_APP_URL}?startapp=${groupId}_${contestId}`;
+    // const webAppUrl = `https://t.me/my_test_contest_bot/apprandom?startapp=${groupId}_${contestId}`;
 
     const promises = chatIdsArray.map(async (chatId) => {
       try {
@@ -172,6 +183,61 @@ export class TelegramService {
     return results;
   }
 
+  async areUsersSubscribed(
+    users: number[],
+    chats: Channel[],
+  ): Promise<SubscriptionResult[]> {
+    this.logger.log(
+      `Проверка подписки ${users.length} пользователей в ${chats.length} чатах`,
+    );
+
+    return Promise.all(
+      users.map(async (telegramId) => {
+        const results = await Promise.allSettled(
+          chats.map(async (chat) => {
+            try {
+              const member = await this.bot.telegram.getChatMember(
+                chat.telegramId,
+                telegramId,
+              );
+              const subscribed = [
+                'member',
+                'administrator',
+                'creator',
+              ].includes(member.status);
+              return { chat: chat.telegramName, subscribed };
+            } catch (err) {
+              this.logger.warn(
+                `Ошибка проверки подписки: chat=${chat.telegramId}, user=${telegramId}, ${err.message}`,
+              );
+              return { chat: chat.telegramName, subscribed: false };
+            }
+          }),
+        );
+
+        // Форматируем результаты
+        const details: SubscriptionDetail[] = results.map((r) =>
+          r.status === 'fulfilled'
+            ? r.value
+            : { chat: 'unknown', subscribed: false },
+        );
+
+        const notSubscribedChats = details
+          .filter((d) => !d.subscribed)
+          .map((d) => d.chat);
+
+        const subscribedToAtLeastOne = details.some((d) => d.subscribed);
+
+        return {
+          telegramId,
+          subscribedToAtLeastOne,
+          details,
+          notSubscribedChats,
+        };
+      }),
+    );
+  }
+
   async sendPrivateMessage(
     telegramId: number | string,
     text: string,
@@ -183,16 +249,17 @@ export class TelegramService {
       return await this.bot.telegram.sendMessage(telegramId, text, {
         parse_mode: 'HTML',
         reply_markup: {
-          inline_keyboard: channelUsername
-            ? [
-                [
-                  {
-                    text,
-                    url: `https://t.me/${channelUsername}/${messageId}`,
-                  },
-                ],
-              ]
-            : [],
+          inline_keyboard:
+            channelUsername && messageId
+              ? [
+                  [
+                    {
+                      text,
+                      url: `https://t.me/${channelUsername}/${messageId}`,
+                    },
+                  ],
+                ]
+              : [],
         },
       });
     } catch (err) {
@@ -219,7 +286,7 @@ export class TelegramService {
     console.log('contest ====> ', contest);
     console.log('fields ====> ', { newName, newText, newImageUrl, buttonText });
 
-    const webAppUrl = `https://t.me/my_test_contest_bot/apprandom?startapp=${channelId}_${contest.id}`;
+    const webAppUrl = `${process.env.MINI_APP_URL}?startapp=${channelId}_${contest.id}`;
     const countPart =
       contest.status === 'active' ? `(${contest.participants.length + 1})` : '';
     const inlineKeyboard: InlineKeyboardMarkup =
