@@ -59,7 +59,7 @@ export class CreateContestDto {
   })
   @IsOptional()
   @Type(() => Date)
-  @IsDateString()
+  @IsDate({ message: 'Дата начала должна быть корректной датой' })
   startDate?: Date;
 
   @ApiProperty({
@@ -67,7 +67,7 @@ export class CreateContestDto {
     example: '2025-09-10T23:59:59Z',
   })
   @Type(() => Date)
-  @IsDateString()
+  @IsDate({ message: 'Дата начала должна быть корректной датой' })
   endDate: Date;
 
   @ApiPropertyOptional({
