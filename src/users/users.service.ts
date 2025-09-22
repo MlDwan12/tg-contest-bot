@@ -199,8 +199,12 @@ export class UsersService {
         ? await this._contestService.getContestById(dto.contestId)
         : undefined;
 
-      const channel = dto.channelUsername
-        ? await this._channelService.findOneByName(dto.channelUsername)
+      const channel = dto.channelId
+        ? (
+            await this._channelService.findManyByColumn('telegramId', [
+              dto.channelId,
+            ])
+          )[0]
         : null;
 
       const channelName = channel ? channel.telegramName : undefined;
@@ -294,7 +298,7 @@ export class UsersService {
         );
 
         this.logger.log(
-          `broadcast: режим=GROUP, group=${dto.channelUsername}, пользователей=${targets.length}`,
+          `broadcast: режим=GROUP, group=${dto.channelId}, пользователей=${targets.length}`,
         );
       }
 

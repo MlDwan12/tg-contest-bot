@@ -6,6 +6,6 @@ export class BroadcastDto {
   userTgId?: string;
   contestId?: number;
   imageUrl?: string;
-  channelUsername?: string;
+  channelId?: string;
   channels?: string[];
 }
