@@ -19,7 +19,7 @@ export class AuthController {
   private readonly logger = new Logger(ChannelController.name);
 
   @Get('me')
-  @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard)
   checkAuth() {
     return { authenticated: true };
   }
