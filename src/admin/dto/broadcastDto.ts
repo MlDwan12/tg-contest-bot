@@ -7,5 +7,5 @@ export class BroadcastDto {
   contestId?: number;
   imageUrl?: string;
   channelId?: string;
-  channels?: string[];
+  channels?: string;
 }

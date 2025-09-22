@@ -250,12 +250,13 @@ export class UsersService {
         // 🔹 всем участникам группы
         const channels = await this._channelService.findManyByColumn(
           'telegramId',
-          dto.channels!,
+          dto.channels!.split(','),
         );
+        console.log('Поиск каналы ====>', channels);
 
         if (!channels) {
           this.logger.warn(
-            `broadcast: группы с именами: ${dto.channels?.join(', ')} не найден`,
+            `broadcast: группы с именами: ${dto.channels} не найден`,
           );
           return { success: false, message: 'Channels not found' };
         }
@@ -264,7 +265,7 @@ export class UsersService {
           'groupId',
           channels.map((c) => Number(c.telegramId)),
         );
-        console.log(users);
+        console.log('Users в каналах', users);
 
         const uniqueUsers = Array.from(
           new Map(users.map((u) => [u.user.telegramId, u.user])).values(),
@@ -272,10 +273,13 @@ export class UsersService {
 
         targets = uniqueUsers.map((u) => Number(u.telegramId));
 
+        console.log('Проверка активных юзеров');
+
         const checkedUsers = await this._telegramService.areUsersSubscribed(
           targets,
           channels,
         );
+        console.log('Рассылка');
 
         await Promise.all(
           checkedUsers
