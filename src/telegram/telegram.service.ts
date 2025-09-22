@@ -280,6 +280,7 @@ export class TelegramService {
     channelUsername?: string,
     messageId?: string,
     photoUrl?: string, // добавляем параметр для изображения
+    buttonText?: string,
   ): Promise<Message.TextMessage | Message.PhotoMessage> {
     try {
       this.logger.log(`Отправка ЛС пользователю ${telegramId}`);
@@ -301,7 +302,7 @@ export class TelegramService {
                     inline_keyboard: [
                       [
                         {
-                          text: 'Перейти',
+                          text: buttonText ?? 'Перейти',
                           url: `https://t.me/${channelUsername}/${messageId}`,
                         },
                       ],
