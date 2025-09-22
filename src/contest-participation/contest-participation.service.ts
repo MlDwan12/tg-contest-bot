@@ -110,6 +110,7 @@ export class ContestParticipationService {
       },
       relations: { contest: true, user: true },
     });
+    console.log('ПОЛУЧЕНИЕ ДАННЫХ ПОБЕДИТЕЛЕЙ======>', participants);
 
     if (!contest) {
       this.logger.warn(`Конкурс id=${contestId} не найден`);
@@ -121,8 +122,6 @@ export class ContestParticipationService {
     );
 
     const participantsUpdate = participants;
-    console.log('contest.winners.=====>', contest.winners);
-    console.log('contest.winnerStrategy=====>', contest.winnerStrategy);
 
     if (contest.winnerStrategy === 'manual' && !contest.winners.length) {
       contest.winnerStrategy = 'random';

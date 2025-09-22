@@ -237,6 +237,8 @@ export class ContestService {
     }
 
     if (dto.winners) {
+      console.log('ПОДКРУЧЕННЫЕ=======>', dto.winners);
+
       // Сохраняем победителей вручную через репозиторий
       const winners = await Promise.all(
         dto.winners.split(',').map(async (userId) => {
@@ -248,6 +250,7 @@ export class ContestService {
           return this.contestWinnerRepo.save(winner); // сохраняем и возвращаем
         }),
       );
+      console.log('КАК ПОЛУЧАЕМ ПОСЛЕ ЗАПИСИ=====>', winners);
 
       // Обновляем relation вручную (без cascade)
       contest.winners = winners;
@@ -332,6 +335,11 @@ export class ContestService {
     let winners: number[] = [];
 
     if (contest.winners?.length) {
+      console.log(
+        'ПРИСВОЕНИЕ МЕСТ ПОЛУЧЕНИЕ до мапа========>',
+        contest.winners,
+      );
+
       winners = contest.winners.flatMap((e) => {
         return e.user.participations
           .map((p) => {
@@ -339,7 +347,10 @@ export class ContestService {
           })
           .filter((p) => p !== undefined);
       });
+
+      console.log('ПРИСВОЕНИЕ МЕСТ ПОЛУЧЕНИЕ после мапа========>', winners);
     }
+
     if (contest.participants && !contest.winners.length) {
       const randomElements = await this.getRandomElement(
         contest.participants,
