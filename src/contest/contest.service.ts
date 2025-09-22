@@ -220,11 +220,9 @@ export class ContestService {
     );
 
     // Если нужно обновить посты в телеграме
-    console.log('TEST ======> ', contest.telegramMessageIds);
     if (dto.description || dto.buttonText || dto.name || dto.imageUrl) {
       for (const msgId of contest.telegramMessageIds ?? []) {
         if (!msgId) continue;
-        console.log('MSG_ID ====> ', msgId);
         const [chatId, messageId] = msgId.split(':');
         await this._telegramPostService.editPost(
           chatId,
@@ -238,7 +236,6 @@ export class ContestService {
       }
     }
 
-    console.log('{WINERS} ==== ', dto.winners);
     if (dto.winners) {
       // Сохраняем победителей вручную через репозиторий
       const winners = await Promise.all(
@@ -327,7 +324,6 @@ export class ContestService {
         },
       },
     });
-    console.log('1231231231231231231===>', contest);
 
     if (!contest) {
       this.logger.error(`Конкурс id=${constestId} не найден`);
@@ -387,7 +383,6 @@ export class ContestService {
         const [chatId, messageId] = e.split(':');
         return { chatId, messageId: Number(messageId) };
       });
-      console.log('POST====>', posts);
 
       this.logger.debug(`Конкурс опубликован в: ${JSON.stringify(posts)}`);
 
@@ -492,8 +487,6 @@ export class ContestService {
 
     while (result.length < n) {
       const randomIndex = Math.floor(Math.random() * arr.length);
-      console.log('1 Проверка подписок ===', arr[randomIndex]);
-      console.log('2 Проверка подписок ===', arr[randomIndex].contest);
 
       const isUnsub = (
         await this._telegramPostService.isUserSubscribed(
@@ -502,7 +495,6 @@ export class ContestService {
           false,
         )
       ).some((r) => !r.subscribed);
-      console.log('Отписался от чего-то', isUnsub);
 
       if (!usedIndices.has(randomIndex) && !isUnsub) {
         usedIndices.add(randomIndex);
