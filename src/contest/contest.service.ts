@@ -238,14 +238,20 @@ export class ContestService {
 
     if (dto.winners) {
       console.log('ПОДКРУЧЕННЫЕ=======>', dto.winners);
-
+      await this.contestWinnerRepo.delete({ contest: { id: contest.id } });
       // Сохраняем победителей вручную через репозиторий
       const winners = await Promise.all(
-        dto.winners.split(',').map(async (userId) => {
+        dto.winners.split(',').map(async (userId, index) => {
           const winner = new ContestWinner();
           winner.user = await this._userService.findOrCreate({
             telegramId: Number(userId),
           });
+
+          await this._contestParticipationService.updatePlace(
+            userId,
+            contest.id,
+            index + 1,
+          );
           winner.contest = contest; // обязательно указываем ссылку на конкурс
           return this.contestWinnerRepo.save(winner); // сохраняем и возвращаем
         }),
@@ -323,7 +329,9 @@ export class ContestService {
       relations: {
         participants: { user: true, contest: { requiredGroups: true } },
         winners: {
-          user: { participations: { contest: { requiredGroups: true } } },
+          user: {
+            participations: { contest: { requiredGroups: true }, user: true },
+          },
         },
       },
     });
@@ -340,10 +348,10 @@ export class ContestService {
         contest.winners,
       );
 
-      winners = contest.winners.flatMap((e) => {
+      return contest.winners.flatMap((e) => {
         return e.user.participations
           .map((p) => {
-            if (p.contest.id === constestId) return p.id;
+            if (p.contest.id === constestId) return p;
           })
           .filter((p) => p !== undefined);
       });

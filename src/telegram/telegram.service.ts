@@ -321,7 +321,7 @@ export class TelegramService {
                   inline_keyboard: [
                     [
                       {
-                        text,
+                        text: 'Перейти к конкурсу',
                         url: `https://t.me/${channelUsername}/${messageId}`,
                       },
                     ],

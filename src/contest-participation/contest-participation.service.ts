@@ -97,6 +97,23 @@ export class ContestParticipationService {
     return [];
   }
 
+  async updatePlace(id: string, contestId: number, place: number) {
+    console.log(id, contestId, place);
+
+    const participation = await this.participationRepo.findOne({
+      where: { user: { telegramId: id }, contest: { id: contestId } },
+      relations: ['contest', 'user'],
+    });
+
+    if (!participation) return null;
+
+    if (participation.contest.id !== contestId) return null;
+
+    participation.prizePlace = place;
+
+    return this.participationRepo.save(participation);
+  }
+
   async updateWinner(ids: number[], contestId: number) {
     this.logger.log(
       `Обновление победителей для конкурса id=${contestId}, ids=${ids}`,
