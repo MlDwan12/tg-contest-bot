@@ -150,7 +150,7 @@ export class UsersService {
     const userMap: Record<number, any> = {};
     users.forEach((u) => {
       console.log(u);
-      
+
       userMap[u.id] = {
         id: u.id,
         username: u.username,
@@ -252,6 +252,7 @@ export class UsersService {
   async broadcast(dto: BroadcastDto) {
     try {
       this.logger.log(`broadcast: старт, параметры=${JSON.stringify(dto)}`);
+      console.log(dto);
 
       let targets: { telegramId: string }[] | number[] = [];
 
@@ -289,6 +290,7 @@ export class UsersService {
           dto.text,
           channelName,
           messageId,
+          messageId && !dto.imageUrl ? contest.imageUrl : dto.imageUrl,
         );
         targets = [{ telegramId: user.telegramId }];
         this.logger.log(`broadcast: режим=USER, userId=${user.telegramId}`);
@@ -335,6 +337,7 @@ export class UsersService {
                   dto.text,
                   channelName,
                   messageId,
+                  messageId && !dto.imageUrl ? contest.imageUrl : dto.imageUrl,
                 )
                 .then(() => {
                   this.logger.log(
@@ -369,6 +372,7 @@ export class UsersService {
                 dto.text,
                 channelName,
                 messageId,
+                messageId && !dto.imageUrl ? contest.imageUrl : dto.imageUrl,
               );
               this.logger.log(
                 `Сообщение отправлено пользователю telegramId=${u.telegramId}`,

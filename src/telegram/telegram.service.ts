@@ -238,30 +238,97 @@ export class TelegramService {
     );
   }
 
+  // async sendPrivateMessage(
+  //   telegramId: number | string,
+  //   text: string,
+  //   channelUsername?: string,
+  //   messageId?: string,
+  // ): Promise<Message.TextMessage | Message.PhotoMessage> {
+  //   try {
+  //     this.logger.log(`Отправка ЛС пользователю ${telegramId}`);
+  //     return await this.bot.telegram.sendMessage(telegramId, text, {
+  //       parse_mode: 'HTML',
+  //       reply_markup: {
+  //         inline_keyboard:
+  //           channelUsername && messageId
+  //             ? [
+  //                 [
+  //                   {
+  //                     text,
+  //                     url: `https://t.me/${channelUsername}/${messageId}`,
+  //                   },
+  //                 ],
+  //               ]
+  //             : [],
+  //       },
+  //     });
+  //   } catch (err) {
+  //     this.logger.error(
+  //       `Ошибка при отправке ЛС пользователю ${telegramId}: ${err.message}`,
+  //       err.stack,
+  //     );
+  //     throw new HttpException(
+  //       'Не удалось отправить сообщение в личку',
+  //       HttpStatus.INTERNAL_SERVER_ERROR,
+  //     );
+  //   }
+  // }
+
   async sendPrivateMessage(
     telegramId: number | string,
     text: string,
     channelUsername?: string,
     messageId?: string,
+    photoUrl?: string, // добавляем параметр для изображения
   ): Promise<Message.TextMessage | Message.PhotoMessage> {
     try {
       this.logger.log(`Отправка ЛС пользователю ${telegramId}`);
-      return await this.bot.telegram.sendMessage(telegramId, text, {
-        parse_mode: 'HTML',
-        reply_markup: {
-          inline_keyboard:
+
+      if (photoUrl) {
+        // Отправляем фото с подписью
+        console.log(photoUrl);
+        const img = createReadStream(`.${photoUrl}`);
+
+        return await this.bot.telegram.sendPhoto(
+          telegramId,
+          { source: img },
+          {
+            caption: text,
+            parse_mode: 'HTML',
+            reply_markup:
+              channelUsername && messageId
+                ? {
+                    inline_keyboard: [
+                      [
+                        {
+                          text,
+                          url: `https://t.me/${channelUsername}/${messageId}`,
+                        },
+                      ],
+                    ],
+                  }
+                : undefined,
+          },
+        );
+      } else {
+        // Отправляем обычное сообщение
+        return await this.bot.telegram.sendMessage(telegramId, text, {
+          parse_mode: 'HTML',
+          reply_markup:
             channelUsername && messageId
-              ? [
-                  [
-                    {
-                      text,
-                      url: `https://t.me/${channelUsername}/${messageId}`,
-                    },
+              ? {
+                  inline_keyboard: [
+                    [
+                      {
+                        text,
+                        url: `https://t.me/${channelUsername}/${messageId}`,
+                      },
+                    ],
                   ],
-                ]
-              : [],
-        },
-      });
+                }
+              : undefined,
+        });
+      }
     } catch (err) {
       this.logger.error(
         `Ошибка при отправке ЛС пользователю ${telegramId}: ${err.message}`,
