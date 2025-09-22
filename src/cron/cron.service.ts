@@ -135,15 +135,15 @@ export class CronService {
         const telegramMessageIds: string[] = [];
 
         if (task.type === ScheduledTaskType.POST_PUBLISH) {
-          const channelsName = contest.requiredGroups
-            .map((e) => `@${e.telegramName}`)
-            .join('\n\n');
+          console.log('Публикация в крон сервисе');
 
           await Promise.all(
             channels.map(async (channel) => {
+              console.log('Канал====>', channel);
+
               const telegramMessageId = await this._telegramService.sendPosts(
                 channel.telegramId,
-                `${contest.name}\n\n${contest.description}\n\n${channelsName}`,
+                `${contest.name}\n\n${contest.description}`,
                 contest.imageUrl,
                 contest.id,
                 channel.telegramId,
@@ -309,6 +309,7 @@ export class CronService {
 
     try {
       if (task.type === ScheduledTaskType.POST_PUBLISH) {
+        this.logger.log(`Немедленное выполнение задачи публикации`);
         const channels = contest.allowedGroups;
         const telegramMessageIds: string[] = [];
 
@@ -316,7 +317,7 @@ export class CronService {
           channels.map(async (channel) => {
             const telegramMessageId = await this._telegramService.sendPosts(
               channel.telegramId,
-              contest.description,
+              `${contest.name}\n\n${contest.description}`,
               contest.imageUrl,
               contest.id,
               channel.telegramId,
