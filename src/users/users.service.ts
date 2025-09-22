@@ -189,70 +189,9 @@ export class UsersService {
     }));
   }
 
-  // async broadcast(data: {
-  //   text: string;
-  //   channelUsername: string;
-  //   messageId: string;
-  // }) {
-  //   try {
-  //     this.logger.log(
-  //       `broadcast: начало рассылки channel=${data.channelUsername}`,
-  //     );
-
-  //     const channel = await this._channelService.findOneByName(
-  //       data.channelUsername,
-  //     );
-  //     const users = await this._contestParticipationService.getAllByGroupId(
-  //       channel?.telegramId!,
-  //     );
-
-  //     this.logger.debug(`broadcast: получено пользователей=${users.length}`);
-
-  //     const uniqueUsers = Array.from(
-  //       new Map(users.map((u) => [u.user.telegramId, u])).values(),
-  //     );
-  //     this.logger.log(
-  //       `broadcast: уникальных пользователей=${uniqueUsers.length}`,
-  //     );
-
-  //     // 🔥 параллельная отправка
-  //     const results = await Promise.allSettled(
-  //       uniqueUsers.map((user) =>
-  //         this._telegramService
-  //           .sendPrivateMessage(
-  //             user.user.telegramId,
-  //             data.text,
-  //             data.channelUsername,
-  //             data.messageId,
-  //           )
-  //           .then(() => {
-  //             this.logger.log(
-  //               `Сообщение отправлено пользователю telegramId=${user.user.telegramId}`,
-  //             );
-  //           }),
-  //       ),
-  //     );
-
-  //     const failed = results.filter((r) => r.status === 'rejected').length;
-  //     if (failed > 0) {
-  //       this.logger.warn(`broadcast: не удалось отправить ${failed} сообщения`);
-  //     }
-
-  //     this.logger.log(
-  //       `broadcast: завершено, всего=${uniqueUsers.length}, ошибок=${failed}`,
-  //     );
-  //   } catch (error) {
-  //     this.logger.error(
-  //       `broadcast: критическая ошибка: ${error.message}`,
-  //       error.stack,
-  //     );
-  //   }
-  // }
-
   async broadcast(dto: BroadcastDto) {
     try {
       this.logger.log(`broadcast: старт, параметры=${JSON.stringify(dto)}`);
-      console.log(dto);
 
       let targets: { telegramId: string }[] | number[] = [];
 
@@ -269,6 +208,13 @@ export class UsersService {
       const messageId = contest?.telegramMessageIds
         ?.find((msg) => msg.split(':')[0] === channel?.telegramId)
         ?.split(':')[1];
+
+      console.log(
+        'messageId, contest, channel=====>',
+        messageId,
+        contest,
+        channel,
+      );
 
       if (dto.type === BroadcastType.USER) {
         // 🔹 одному пользователю
@@ -299,7 +245,7 @@ export class UsersService {
       if (dto.type === BroadcastType.GROUP) {
         // 🔹 всем участникам группы
         const channels = await this._channelService.findManyByColumn(
-          'telegramName',
+          'telegramId',
           dto.channels!,
         );
 
@@ -389,29 +335,6 @@ export class UsersService {
           `broadcast: режим=ALL, пользователей=${targets.length}`,
         );
       }
-
-      // 🔥 параллельная отправка
-      // const results = await Promise.allSettled(
-      //   targets.map((t) =>
-      //     this._telegramService
-      //       .sendPrivateMessage(
-      //         t.telegramId,
-      //         dto.text,
-      //         dto.channelUsername,
-      //         dto.messageId,
-      //       )
-      //       .then(() =>
-      //         this.logger.log(
-      //           `Сообщение отправлено пользователю telegramId=${t.telegramId}`,
-      //         ),
-      //       ),
-      //   ),
-      // );
-
-      // const failed = results.filter((r) => r.status === 'rejected').length;
-      // this.logger.log(
-      //   `broadcast: завершено, всего=${targets.length}, ошибок=${failed}`,
-      // );
 
       return { success: true, total: targets.length };
     } catch (error) {
