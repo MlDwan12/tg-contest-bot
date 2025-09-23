@@ -14,6 +14,7 @@ import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
 import { CronModule } from './cron/cron.module';
 import { BullModule } from '@nestjs/bullmq';
+import { QueueModule } from './queue/queue.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { BullModule } from '@nestjs/bullmq';
     AdminModule,
     AuthModule,
     CronModule,
+    QueueModule,
   ],
   controllers: [],
   providers: [],

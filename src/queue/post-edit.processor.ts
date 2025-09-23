@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
-import { TelegramService } from './telegram.service';
+import { TelegramService } from '../telegram/telegram.service';
 
 @Injectable()
 @Processor('post-edit')
@@ -53,7 +53,7 @@ export class PostEditProcessor extends WorkerHost {
         `Ошибка при обработке задачи ${job.id}: ${error.message}`,
         error.stack,
       );
-      throw error; // пробрасываем дальше, чтобы очередь отметила задачу как failed
+      throw error;
     }
   }
 }

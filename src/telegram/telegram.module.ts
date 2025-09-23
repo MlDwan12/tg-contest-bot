@@ -9,7 +9,8 @@ import { session } from 'telegraf';
 import { ContestParticipationModule } from '../contest-participation/contest-participation.module';
 import { ChannelModule } from 'src/channel/channel.module';
 import { BullModule } from '@nestjs/bullmq';
-import { PostEditProcessor } from './post-edit.processor';
+import { PostEditProcessor } from '../queue/post-edit.processor';
+import { QueueModule } from 'src/queue/queue.module';
 
 @Module({
   imports: [
@@ -21,15 +22,15 @@ import { PostEditProcessor } from './post-edit.processor';
         middlewares: [session()],
       }),
     }),
-    BullModule.registerQueue({
-      name: 'post-edit',
-    }),
+
     forwardRef(() => UsersModule),
     forwardRef(() => ChannelModule),
     forwardRef(() => ContestModule),
     forwardRef(() => ContestParticipationModule),
+    QueueModule,
+    BullModule.registerQueue({ name: 'post-edit' }),
   ],
   providers: [ContestUpdate, TelegramService, PostEditProcessor],
-  exports: [TelegramService, BullModule],
+  exports: [TelegramService],
 })
 export class TelegramModule {}

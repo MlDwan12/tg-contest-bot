@@ -359,7 +359,7 @@ export class TelegramService {
 
     const webAppUrl = `${process.env.MINI_APP_URL}?startapp=${channelId}_${contest.id}`;
     const countPart =
-      contest.status === 'active' ? `(${contest.participants.length + 1})` : '';
+      contest.status === 'active' ? `(${contest.participants.length})` : '';
     const inlineKeyboard: InlineKeyboardMarkup =
       buttonText === 'none'
         ? { inline_keyboard: [] }
@@ -478,6 +478,30 @@ export class TelegramService {
     }
   }
 
+  // async editPostQueue(
+  //   channelId: string,
+  //   messageId: number,
+  //   contest: Contest,
+  //   newName?: string,
+  //   newText?: string,
+  //   newImageUrl?: string,
+  //   buttonText?: string,
+  // ) {
+  //   await this.postEditQueue.add(
+  //     'edit',
+  //     {
+  //       channelId,
+  //       messageId,
+  //       contest,
+  //       newName,
+  //       newText,
+  //       newImageUrl,
+  //       buttonText,
+  //     },
+  //     { delay: 2000 },
+  //   );
+  // }
+
   async editPostQueue(
     channelId: string,
     messageId: number,
@@ -487,6 +511,9 @@ export class TelegramService {
     newImageUrl?: string,
     buttonText?: string,
   ) {
+    // создаём уникальный jobId для одного сообщения
+    const jobId = `edit-${contest.id}-${channelId}-${messageId}`;
+
     await this.postEditQueue.add(
       'edit',
       {
@@ -498,7 +525,12 @@ export class TelegramService {
         newImageUrl,
         buttonText,
       },
-      { delay: 2000 },
+      {
+        delay: 2000, // ждем 2 секунды перед обработкой
+        jobId, // одинаковый jobId для одной задачи
+        removeOnComplete: true,
+        removeOnFail: true,
+      },
     );
   }
 }
