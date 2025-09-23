@@ -44,7 +44,8 @@ export class TelegramService {
     @Inject(forwardRef(() => UsersService))
     private readonly usersService: UsersService,
     @InjectQueue('post-edit') private postEditQueue: Queue,
-  ) {}
+  ) {
+  }
 
   async sendPosts(
     chatIds: string | string[],
@@ -302,15 +303,15 @@ export class TelegramService {
             reply_markup:
               channelUsername && messageId
                 ? {
-                    inline_keyboard: [
-                      [
-                        {
-                          text: buttonText ?? 'Перейти',
-                          url: `https://t.me/${channelUsername}/${messageId}`,
-                        },
-                      ],
+                  inline_keyboard: [
+                    [
+                      {
+                        text: buttonText ?? 'Перейти',
+                        url: `https://t.me/${channelUsername}/${messageId}`,
+                      },
                     ],
-                  }
+                  ],
+                }
                 : undefined,
           },
         );
@@ -321,15 +322,15 @@ export class TelegramService {
           reply_markup:
             channelUsername && messageId
               ? {
-                  inline_keyboard: [
-                    [
-                      {
-                        text: 'Перейти к конкурсу',
-                        url: `https://t.me/${channelUsername}/${messageId}`,
-                      },
-                    ],
+                inline_keyboard: [
+                  [
+                    {
+                      text: 'Перейти к конкурсу',
+                      url: `https://t.me/${channelUsername}/${messageId}`,
+                    },
                   ],
-                }
+                ],
+              }
               : undefined,
         });
       }
@@ -353,26 +354,27 @@ export class TelegramService {
     newText?: string,
     newImageUrl?: string,
     buttonText?: string,
+    counter?: null | number,
   ): Promise<TextMessage | PhotoMessage | true | undefined> {
     console.log('contest ====> ', contest);
     console.log('fields ====> ', { newName, newText, newImageUrl, buttonText });
 
     const webAppUrl = `${process.env.MINI_APP_URL}?startapp=${channelId}_${contest.id}`;
     const countPart =
-      contest.status === 'active' ? `(${contest.participants.length})` : '';
+      contest.status === 'active' ? `(${counter ?? contest.participants.length})` : '';
     const inlineKeyboard: InlineKeyboardMarkup =
       buttonText === 'none'
         ? { inline_keyboard: [] }
         : {
-            inline_keyboard: [
-              [
-                {
-                  text: `${buttonText ?? contest.buttonText ?? 'Участвую! 🎉'} ${countPart}`,
-                  url: webAppUrl,
-                },
-              ],
+          inline_keyboard: [
+            [
+              {
+                text: `${buttonText ?? contest.buttonText ?? 'Участвую! 🎉'} ${countPart}`,
+                url: webAppUrl,
+              },
             ],
-          };
+          ],
+        };
     const contentText = `${newName ?? contest.name}\n\n${newText ?? contest.description}`;
 
     try {
@@ -520,6 +522,7 @@ export class TelegramService {
     const existingJob = await this.postEditQueue.getJob(jobId);
 
     if (existingJob) {
+      console.log('=====> ОТРАБОТКА СКЛЕЙКИ');
       const data = existingJob.data;
 
       const updatedData = {
@@ -536,6 +539,7 @@ export class TelegramService {
 
       await existingJob.updateData(updatedData);
     } else {
+      console.log('=====> ОТРАБОТКА НОВОЙ ЗАДАЧИ');
       await this.postEditQueue.add(
         jobType,
         {
@@ -546,10 +550,10 @@ export class TelegramService {
           newText,
           newImageUrl,
           buttonText,
-          clickCount: contest.participants.length + 1,
+          clickCount: isAdminChange ? contest.participants.length : contest.participants.length + 1,
         },
         {
-          delay: 2000,
+          delay: 5000,
           jobId,
           removeOnComplete: true,
           removeOnFail: true,
