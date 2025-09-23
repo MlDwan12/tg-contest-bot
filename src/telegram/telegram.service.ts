@@ -502,6 +502,7 @@ export class TelegramService {
   //   );
   // }
 
+  // TelegramService
   async editPostQueue(
     channelId: string,
     messageId: number,
@@ -510,27 +511,50 @@ export class TelegramService {
     newText?: string,
     newImageUrl?: string,
     buttonText?: string,
+    isAdminChange = false,
   ) {
-    // создаём уникальный jobId для одного сообщения
-    const jobId = `edit-${contest.id}-${channelId}-${messageId}`;
+    // Разные jobId для кликов и админских изменений
+    const jobType = isAdminChange ? 'edit-admin' : 'edit-counter';
+    const jobId = `${jobType}-${contest.id}-${channelId}-${messageId}`;
 
-    await this.postEditQueue.add(
-      'edit',
-      {
-        channelId,
-        messageId,
+    const existingJob = await this.postEditQueue.getJob(jobId);
+
+    if (existingJob) {
+      const data = existingJob.data;
+
+      const updatedData = {
+        ...data,
         contest,
-        newName,
-        newText,
-        newImageUrl,
-        buttonText,
-      },
-      {
-        delay: 2000, // ждем 2 секунды перед обработкой
-        jobId, // одинаковый jobId для одной задачи
-        removeOnComplete: true,
-        removeOnFail: true,
-      },
-    );
+        clickCount: isAdminChange
+          ? data.clickCount
+          : (data.clickCount ?? contest.participants.length) + 1,
+        newName: newName ?? data.newName,
+        newText: newText ?? data.newText,
+        newImageUrl: newImageUrl ?? data.newImageUrl,
+        buttonText: buttonText ?? data.buttonText,
+      };
+
+      await existingJob.updateData(updatedData);
+    } else {
+      await this.postEditQueue.add(
+        jobType,
+        {
+          channelId,
+          messageId,
+          contest,
+          newName,
+          newText,
+          newImageUrl,
+          buttonText,
+          clickCount: contest.participants.length + 1,
+        },
+        {
+          delay: 2000,
+          jobId,
+          removeOnComplete: true,
+          removeOnFail: true,
+        },
+      );
+    }
   }
 }

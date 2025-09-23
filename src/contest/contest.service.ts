@@ -244,6 +244,7 @@ export class ContestService {
           dto.description ?? undefined,
           dto.imageUrl ?? undefined,
           dto.buttonText ?? undefined,
+          true,
         );
       }
     }
@@ -627,6 +628,7 @@ export class ContestService {
         undefined,
         undefined,
         'none',
+        true,
       );
     }
   }

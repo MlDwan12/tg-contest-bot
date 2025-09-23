@@ -3,6 +3,7 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { TelegramService } from '../telegram/telegram.service';
 
+// PostEditProcessor
 @Injectable()
 @Processor('post-edit')
 export class PostEditProcessor extends WorkerHost {
@@ -17,8 +18,32 @@ export class PostEditProcessor extends WorkerHost {
     this.logger.debug(`Данные задачи: ${JSON.stringify(job.data)}`);
 
     try {
-      if (job.name === 'edit') {
-        const {
+      const {
+        channelId,
+        messageId,
+        contest,
+        buttonText,
+        newName,
+        newText,
+        newImageUrl,
+      } = job.data;
+
+      if (job.name === 'edit-counter') {
+        // Только обновляем кнопку/счётчик
+        return await this.telegramService.editPost(
+          channelId,
+          messageId,
+          contest,
+          undefined,
+          undefined,
+          undefined,
+          buttonText,
+        );
+      }
+
+      if (job.name === 'edit-admin') {
+        // Полное редактирование админом
+        return await this.telegramService.editPost(
           channelId,
           messageId,
           contest,
@@ -26,27 +51,7 @@ export class PostEditProcessor extends WorkerHost {
           newText,
           newImageUrl,
           buttonText,
-        } = job.data;
-
-        this.logger.log(
-          `Редактирование поста: channelId=${channelId}, messageId=${messageId}`,
         );
-
-        const result = await this.telegramService.editPost(
-          channelId,
-          messageId,
-          contest,
-          newName,
-          newText,
-          newImageUrl,
-          buttonText,
-        );
-
-        this.logger.log(
-          `Задача ${job.id} успешно выполнена: messageId=${messageId}`,
-        );
-        this.logger.debug(`Результат: ${JSON.stringify(result)}`);
-        return result;
       }
     } catch (error) {
       this.logger.error(

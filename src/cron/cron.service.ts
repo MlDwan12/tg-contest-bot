@@ -226,6 +226,7 @@ export class CronService {
                   undefined,
                   undefined,
                   'Узнать результат',
+                  true,
                 );
               }
             }

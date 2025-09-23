@@ -100,6 +100,7 @@ export class ContestParticipationService {
             undefined,
             undefined,
             contest.buttonText,
+            false,
           );
         }),
       );
