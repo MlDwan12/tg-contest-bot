@@ -82,7 +82,17 @@ export class ContestParticipationService {
         contest.telegramMessageIds.map(async (e) => {
           const [channel, message] = e.split(':');
 
-          await this.telegramService.editPost(
+          // await this.telegramService.editPost(
+          //   channel,
+          //   Number(message),
+          //   contest,
+          //   undefined,
+          //   undefined,
+          //   undefined,
+          //   contest.buttonText,
+          // );
+
+          await this.telegramService.editPostQueue(
             channel,
             Number(message),
             contest,

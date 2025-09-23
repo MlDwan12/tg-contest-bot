@@ -8,6 +8,8 @@ import { TelegramService } from './telegram.service';
 import { session } from 'telegraf';
 import { ContestParticipationModule } from '../contest-participation/contest-participation.module';
 import { ChannelModule } from 'src/channel/channel.module';
+import { BullModule } from '@nestjs/bullmq';
+import { PostEditProcessor } from './post-edit.processor';
 
 @Module({
   imports: [
@@ -19,12 +21,15 @@ import { ChannelModule } from 'src/channel/channel.module';
         middlewares: [session()],
       }),
     }),
+    BullModule.registerQueue({
+      name: 'post-edit',
+    }),
     forwardRef(() => UsersModule),
     forwardRef(() => ChannelModule),
     forwardRef(() => ContestModule),
     forwardRef(() => ContestParticipationModule),
   ],
-  providers: [ContestUpdate, TelegramService],
-  exports: [TelegramService],
+  providers: [ContestUpdate, TelegramService, PostEditProcessor],
+  exports: [TelegramService, BullModule],
 })
 export class TelegramModule {}

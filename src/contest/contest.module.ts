@@ -10,6 +10,7 @@ import { ChannelModule } from 'src/channel/channel.module';
 import { AdminModule } from 'src/admin/admin.module';
 import { CronModule } from 'src/cron/cron.module';
 import { UsersModule } from 'src/users/users.module';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
@@ -20,6 +21,9 @@ import { UsersModule } from 'src/users/users.module';
     forwardRef(() => TelegramModule),
     forwardRef(() => CronModule),
     forwardRef(() => UsersModule),
+    BullModule.registerQueue({
+      name: 'post-edit',
+    }),
   ],
   controllers: [ContestController],
   providers: [ContestService],

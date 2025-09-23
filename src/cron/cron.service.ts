@@ -208,7 +208,17 @@ export class CronService {
 
             for (const msgId of contest.telegramMessageIds ?? []) {
               if (msgId) {
-                await this._telegramService.editPost(
+                // await this._telegramService.editPost(
+                //   msgId.split(':')[0],
+                //   Number(msgId.split(':')[1]),
+                //   contest,
+                //   undefined,
+                //   undefined,
+                //   undefined,
+                //   'Узнать результат',
+                // );
+
+                await this._telegramService.editPostQueue(
                   msgId.split(':')[0],
                   Number(msgId.split(':')[1]),
                   contest,

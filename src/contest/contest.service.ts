@@ -23,6 +23,8 @@ import { ContestWinner } from './entities/contest_winners.entity';
 import { join } from 'path';
 import { promises as fs } from 'fs';
 import { ContestParticipation } from 'src/contest-participation/entities/contest-participation.entity';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 
 @Injectable()
 export class ContestService {
@@ -224,7 +226,17 @@ export class ContestService {
       for (const msgId of contest.telegramMessageIds ?? []) {
         if (!msgId) continue;
         const [chatId, messageId] = msgId.split(':');
-        await this._telegramPostService.editPost(
+        // await this._telegramPostService.editPost(
+        //   chatId,
+        //   Number(messageId),
+        //   contest,
+        //   dto.name ?? undefined,
+        //   dto.description ?? undefined,
+        //   dto.imageUrl ?? undefined,
+        //   dto.buttonText ?? undefined,
+        // );
+
+        await this._telegramPostService.editPostQueue(
           chatId,
           Number(messageId),
           contest,
@@ -355,8 +367,6 @@ export class ContestService {
           })
           .filter((p) => p !== undefined);
       });
-
-      console.log('ПРИСВОЕНИЕ МЕСТ ПОЛУЧЕНИЕ после мапа========>', winners);
     }
 
     if (contest.participants && !contest.winners.length) {
@@ -599,7 +609,17 @@ export class ContestService {
       if (!msgId) continue;
 
       const [chatId, messageId] = msgId.split(':');
-      await this._telegramPostService.editPost(
+      // await this._telegramPostService.editPost(
+      //   chatId,
+      //   Number(messageId),
+      //   contest,
+      //   undefined,
+      //   undefined,
+      //   undefined,
+      //   'none',
+      // );
+
+      await this._telegramPostService.editPostQueue(
         chatId,
         Number(messageId),
         contest,

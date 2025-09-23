@@ -17,6 +17,8 @@ import {
 import { Channel } from 'src/channel/entities/channel.entity';
 import { Contest } from 'src/contest/entities/contest.entity';
 import { UsersService } from 'src/users/users.service';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 
 type TextMessage = Message.TextMessage;
 type PhotoMessage = Message.PhotoMessage;
@@ -41,6 +43,7 @@ export class TelegramService {
     @InjectBot() private readonly bot: Telegraf<any>,
     @Inject(forwardRef(() => UsersService))
     private readonly usersService: UsersService,
+    @InjectQueue('post-edit') private postEditQueue: Queue,
   ) {}
 
   async sendPosts(
@@ -473,5 +476,29 @@ export class TelegramService {
     } catch (err) {
       throw new Error(`Telegram bot not available: ${err.message}`);
     }
+  }
+
+  async editPostQueue(
+    channelId: string,
+    messageId: number,
+    contest: Contest,
+    newName?: string,
+    newText?: string,
+    newImageUrl?: string,
+    buttonText?: string,
+  ) {
+    await this.postEditQueue.add(
+      'edit',
+      {
+        channelId,
+        messageId,
+        contest,
+        newName,
+        newText,
+        newImageUrl,
+        buttonText,
+      },
+      { delay: 2000 },
+    );
   }
 }
