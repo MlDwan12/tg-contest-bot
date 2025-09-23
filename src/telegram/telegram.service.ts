@@ -1,4 +1,11 @@
-import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import {
+  forwardRef,
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { Telegraf, Telegram } from 'telegraf';
 import { InjectBot } from 'nestjs-telegraf';
 import { createReadStream } from 'fs';
@@ -9,8 +16,8 @@ import {
 } from 'telegraf/typings/core/types/typegram';
 import { Channel } from 'src/channel/entities/channel.entity';
 import { Contest } from 'src/contest/entities/contest.entity';
-import path from 'path';
-// import path from 'path';
+import { UsersService } from 'src/users/users.service';
+import { RedisService } from 'src/redis/redis.service';
 
 type TextMessage = Message.TextMessage;
 type PhotoMessage = Message.PhotoMessage;
@@ -19,7 +26,12 @@ type PhotoMessage = Message.PhotoMessage;
 export class TelegramService {
   private readonly logger = new Logger(TelegramService.name);
 
-  constructor(@InjectBot() private readonly bot: Telegraf<any>) {}
+  constructor(
+    @InjectBot() private readonly bot: Telegraf<any>,
+    @Inject(forwardRef(() => UsersService))
+    private readonly usersService: UsersService,
+    private readonly redis: RedisService,
+  ) {}
 
   async sendPosts(
     chatIds: string | string[],
@@ -411,6 +423,8 @@ export class TelegramService {
     newImageUrl?: string,
     buttonText?: string,
   ): Promise<TextMessage | PhotoMessage | true | undefined> {
+    const key = `contest:${contest.id}:${channelId}:${messageId}`;
+    const count = await this.redis.client.incr(key);
     console.log('contest ====> ', contest);
     console.log('fields ====> ', { newName, newText, newImageUrl, buttonText });
 
@@ -525,6 +539,15 @@ export class TelegramService {
         'Не удалось проверить права бота в канале',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
+    }
+  }
+
+  async checkHealth() {
+    try {
+      const me = await this.bot.telegram.getMe();
+      return me;
+    } catch (err) {
+      throw new Error(`Telegram bot not available: ${err.message}`);
     }
   }
 }

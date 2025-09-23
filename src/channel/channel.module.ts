@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { ChannelService } from './channel.service';
 import { ChannelController } from './channel.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -6,7 +6,10 @@ import { Channel } from './entities/channel.entity';
 import { TelegramModule } from 'src/telegram/telegram.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Channel]), TelegramModule],
+  imports: [
+    TypeOrmModule.forFeature([Channel]),
+    forwardRef(() => TelegramModule),
+  ],
   controllers: [ChannelController],
   providers: [ChannelService],
   exports: [ChannelService],

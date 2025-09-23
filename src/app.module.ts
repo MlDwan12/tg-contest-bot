@@ -13,6 +13,7 @@ import { join } from 'path';
 import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
 import { CronModule } from './cron/cron.module';
+import { BullModule } from '@nestjs/bull';
 
 @Module({
   imports: [
@@ -38,6 +39,12 @@ import { CronModule } from './cron/cron.module';
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'uploads'),
       serveRoot: '/uploads',
+    }),
+    BullModule.forRoot({
+      redis: { host: 'localhost', port: 6379 },
+    }),
+    BullModule.registerQueue({
+      name: 'contest',
     }),
     UsersModule,
     ContestModule,

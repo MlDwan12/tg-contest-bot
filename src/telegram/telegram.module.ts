@@ -7,6 +7,9 @@ import { ContestUpdate } from './contest.update';
 import { ContestParticipationModule } from 'src/contest-participation/contest-participation.module';
 import { TelegramService } from './telegram.service';
 import { session } from 'telegraf';
+import { ChannelModule } from 'src/channel/channel.module';
+import { RedisModule } from 'src/redis/redis.module';
+import { BullModule } from '@nestjs/bull';
 
 @Module({
   imports: [
@@ -18,7 +21,10 @@ import { session } from 'telegraf';
         middlewares: [session()],
       }),
     }),
-    UsersModule,
+    RedisModule,
+    BullModule.registerQueue({ name: 'contest' }),
+    forwardRef(() => UsersModule),
+    forwardRef(() => ChannelModule),
     forwardRef(() => ContestModule),
     forwardRef(() => ContestParticipationModule),
   ],
