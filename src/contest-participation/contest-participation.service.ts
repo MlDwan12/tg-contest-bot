@@ -31,70 +31,48 @@ export class ContestParticipationService {
     contest: Contest,
     status: 'verified' | 'winner' = 'verified',
     groupId: number,
-  ): Promise<{ data: [] } | ContestParticipation[]> {
-    // //this.logger.log(
-    //   `Регистрация участия пользователя ${user.username} в конкурсе ${contest.name} (contestId=${contest.id})`,
-    // );
-
-    // Проверка подписки
+  ): Promise<ContestParticipation[] | { data: [] }> {
     await this.telegramService.isUserSubscribed(
       contest.requiredGroups,
       Number(user.telegramId),
     );
-    // //this.logger.log(
-    //   `Проверка подписки пользователя ${user.telegramId} завершена`,
-    // );
 
     if (contest.status === 'completed') {
-      const winners = contest.participants.filter((p) => p.status === 'winner');
-      // //this.logger.log(
-      //   `Конкурс уже завершен, возвращаем победителей: ${winners.map((p) => p.user.id)}`,
-      // );
+      const winners = await this.participationRepo.find({
+        where: { contest: { id: contest.id }, status: 'winner' },
+        relations: { user: true },
+        select: ['id', 'status', 'user', 'contest'],
+      });
       return winners;
     }
 
-    const exists = await this.participationRepo.findOne({
-      where: { user: { id: user.id }, contest: { id: contest.id } },
-    });
-
-    if (exists) {
-      // //this.logger.log(
-      //   `Участие пользователя ${user.id} уже существует, обновляем статус`,
-      // );
-      exists.status = status;
-      await this.participationRepo.save(exists);
-      return [];
-    }
-
-    const participation = this.participationRepo.create({
-      user,
-      contest,
-      status,
-      groupId,
-    });
-    await this.participationRepo.save(participation);
-    // //this.logger.log(
-    //   `Участие пользователя ${user.id} создано с id=${participation.id}`,
-    // );
+    const [participation] = await this.participationRepo.query(
+      `
+    INSERT INTO contest_participations("userId", "contestId", "status", "groupId")
+    VALUES ($1, $2, $3, $4)
+    ON CONFLICT("userId", "contestId") DO UPDATE
+    SET "status" = EXCLUDED."status", "groupId" = EXCLUDED."groupId"
+    RETURNING id, "userId", "contestId", status, "groupId"
+  `,
+      [user.id, contest.id, status, groupId],
+    );
 
     if (contest.telegramMessageIds?.length) {
-      await Promise.all(
-        contest.telegramMessageIds.map(async (e) => {
-          const [channel, message] = e.split(':');
-
-          await this.telegramService.editPostQueue(
-            channel,
-            Number(message),
-            contest,
-            undefined,
-            undefined,
-            undefined,
-            contest.buttonText,
-            false,
-          );
-        }),
-      );
+      contest.telegramMessageIds.forEach((e) => {
+        const [channel, message] = e.split(':');
+        this.telegramService.editPostQueue(
+          channel,
+          Number(message),
+          contest,
+          undefined,
+          undefined,
+          undefined,
+          contest.buttonText,
+          false,
+        );
+      });
     }
+
     return [];
   }
 

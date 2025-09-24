@@ -38,9 +38,9 @@ export class UsersController {
     type: User,
   })
   async create(@Body() dto: CreateUserDto): Promise<User> {
-    // //this.logger.log(
-    //   `Создание пользователя: telegramId=${dto.telegramId}, username=${dto.userName}`,
-    // );
+    this.logger.log(
+      `Создание пользователя: telegramId=${dto.telegramId}, username=${dto.userName}`,
+    );
     const user = await this.usersService.findOrCreate(dto);
     //this.logger.log(`Пользователь успешно создан/найден: id=${user.id}`);
     return user;

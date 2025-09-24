@@ -156,6 +156,7 @@ export class TelegramService {
     //   `Проверка подписки пользователя ${telegramId} в ${chats.length} чатах`,
     // );
     const results: { chat: string; subscribed: boolean }[] = [];
+console.log(chats);
 
     for (const chat of chats) {
       try {

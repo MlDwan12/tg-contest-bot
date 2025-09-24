@@ -41,37 +41,53 @@ export class UsersService {
       `findOrCreate: telegramId=${telegramId}, username=${username}`,
     );
 
-    let user = await this.userRepo.findOne({
-      where: { telegramId },
-      select: ['id', 'telegramId', 'username'],
-    });
+    // let user = await this.userRepo.findOne({
+    //   where: { telegramId },
+    //   select: ['id', 'telegramId', 'username'],
+    // });
 
-    if (user) {
-      // //this.logger.log(
-      //   `Пользователь найден: id=${user.id}, username=${user.username}`,
-      // );
-      return user;
-    }
+    // if (user) {
+    //   // //this.logger.log(
+    //   //   `Пользователь найден: id=${user.id}, username=${user.username}`,
+    //   // );
+    //   return user;
+    // }
 
-    this.logger.warn(
-      `Пользователь не найден, создаём нового telegramId=${telegramId}`,
+    // this.logger.warn(
+    //   `Пользователь не найден, создаём нового telegramId=${telegramId}`,
+    // );
+
+    // try {
+    //   user = await this.userRepo.save(
+    //     this.userRepo.create({ telegramId, username }),
+    //   );
+    //   // //this.logger.log(
+    //   //   `Новый пользователь создан: id=${user.id}, username=${user.username}`,
+    //   // );
+    // } catch (error) {
+    //   this.logger.error(
+    //     `Ошибка при создании пользователя telegramId=${telegramId}: ${error.message}`,
+    //     error.stack,
+    //   );
+    //   user = await this.userRepo.findOne({ where: { telegramId } });
+    //   if (!user) throw error;
+    // }
+
+    // return user;
+
+    // const telegramId = String(tgUser.telegramId);
+    // const username = tgUser.userName;
+    //спорный момент пропуск в 2 раза ниже но потребление памяти в 2 раза ниже
+    const [user] = await this.userRepo.query(
+      `
+      INSERT INTO users("telegramId", "username")
+      VALUES ($1, $2)
+      ON CONFLICT("telegramId") DO UPDATE
+      SET "username" = EXCLUDED."username"
+      RETURNING id, "telegramId", "username"
+    `,
+      [telegramId, username],
     );
-
-    try {
-      user = await this.userRepo.save(
-        this.userRepo.create({ telegramId, username }),
-      );
-      // //this.logger.log(
-      //   `Новый пользователь создан: id=${user.id}, username=${user.username}`,
-      // );
-    } catch (error) {
-      this.logger.error(
-        `Ошибка при создании пользователя telegramId=${telegramId}: ${error.message}`,
-        error.stack,
-      );
-      user = await this.userRepo.findOne({ where: { telegramId } });
-      if (!user) throw error;
-    }
 
     return user;
   }

@@ -28,10 +28,22 @@ export class ContestController {
 
   constructor(private readonly contestService: ContestService) {}
 
-  @Get()
-  getAll(): Promise<Contest[]> {
+  @Get('short-info')
+  getAllContestsShortInfo(): Promise<Contest[]> {
     //this.logger.log('Получен запрос: список всех конкурсов');
-    return this.contestService.getContests();
+    return this.contestService.getContestsShortInfo({
+      fields: ['id', 'name', 'startDate', 'endDate', 'status'],
+      include: {
+        creator: ['id', 'userName'],
+        participants: { user: ['telegramId', 'id', 'username'] },
+      },
+    });
+  }
+
+  @Get()
+  getAllContestsFullInfo(): Promise<Contest[]> {
+    //this.logger.log('Получен запрос: список всех конкурсов');
+    return this.contestService.getContestsFullInfo();
   }
 
   @Get(':id')

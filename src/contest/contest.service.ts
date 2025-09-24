@@ -24,6 +24,9 @@ import { join } from 'path';
 import { promises as fs } from 'fs';
 import { ContestParticipation } from 'src/contest-participation/entities/contest-participation.entity';
 import { ConfigService } from '@nestjs/config';
+import { Admin } from 'src/admin/entities/admin.entity';
+import { User } from 'src/users/entities/user.entity';
+import { Channel } from 'src/channel/entities/channel.entity';
 
 @Injectable()
 export class ContestService {
@@ -73,38 +76,118 @@ export class ContestService {
     return this.contestRepo.find({ where: { status: 'active' } });
   }
 
-  async getContests(): Promise<Contest[]> {
-    return this.contestRepo.query(`SELECT
-      contest.id AS id,
-      contest.name AS name,
-      contest."winnerStrategy" AS "winnerStrategy",
-      contest."startDate" AS "startDate",
-      contest."endDate" AS "endDate",
-      creator.id AS "creatorId",
-      creator."userName" AS "creatorUsername",
-      COUNT(participants.id) AS "participantCount"
-  FROM contests AS contest
-  LEFT JOIN admins AS creator
-      ON creator.id = contest."creatorId"
-  LEFT JOIN contest_participations AS participants
-      ON participants."contestId" = contest.id
-  GROUP BY contest.id, creator.id;`);
+  async getContestsShortInfo(options?: {
+    fields?: (keyof Contest)[];
+    include?: {
+      creator?: (keyof Admin)[];
+      participants?: {
+        fields?: (keyof ContestParticipation)[];
+        user?: (keyof User)[];
+      };
+      winners?: {
+        fields?: (keyof ContestWinner)[];
+        user?: (keyof User)[];
+      };
+      allowedGroups?: (keyof Channel)[];
+      requiredGroups?: (keyof Channel)[];
+    };
+  }) {
+    const fields = options?.fields?.length
+      ? options.fields.map((f) => `contest."${f}"`).join(', ')
+      : 'contest.*';
+
+    let joins = '';
+    const extraFields: string[] = [];
+
+    if (options?.include?.creator) {
+      joins += ` LEFT JOIN admins AS creator ON creator.id = contest."creatorId"`;
+      const creatorFields = options.include.creator
+        .map((f) => `creator."${f}" AS "creator_${f}"`)
+        .join(', ');
+      extraFields.push(creatorFields);
+    }
+
+    if (options?.include?.participants) {
+      joins += ` LEFT JOIN contest_participations AS participants ON participants."contestId" = contest.id`;
+      extraFields.push(`COUNT(participants.id) AS "participantCount"`);
+    }
+
+    if (options?.include?.winners) {
+      joins += ` LEFT JOIN contest_winners AS winners ON winners."contestId" = contest.id`;
+      extraFields.push(`COUNT(winners.id) AS "winnerCount"`);
+    }
+
+    if (options?.include?.allowedGroups) {
+      joins += ` LEFT JOIN contest_allowed_channels AS ac ON ac."contestId" = contest.id`;
+      joins += ` LEFT JOIN channels AS allowedGroups ON allowedGroups.id = ac."channelId"`;
+      extraFields.push(`json_agg(DISTINCT allowedGroups.*) AS "allowedGroups"`);
+    }
+
+    if (options?.include?.requiredGroups) {
+      joins += ` LEFT JOIN contest_required_channels AS rc ON rc."contestId" = contest.id`;
+      joins += ` LEFT JOIN channels AS requiredGroups ON requiredGroups.id = rc."channelId"`;
+      extraFields.push(
+        `json_agg(DISTINCT requiredGroups.*) AS "requiredGroups"`,
+      );
+    }
+
+    const sql = `
+    SELECT
+      ${fields}
+      ${extraFields.length ? ', ' + extraFields.join(', ') : ''}
+    FROM contests AS contest
+    ${joins}
+    GROUP BY contest.id${options?.include?.creator ? ', creator.id' : ''}
+  `;
+
+    return this.contestRepo.query(sql);
   }
 
-  async getContestById(id: number): Promise<Contest | null | undefined> {
-    //this.logger.log(`Поиск конкурса по id=${id}`);
+  async getContestsFullInfo(): Promise<Contest[]> {
+    this.logger.log('Запрос списка всех конкурсов');
     return this.contestRepo
       .createQueryBuilder('contest')
       .leftJoinAndSelect('contest.creator', 'creator')
       .leftJoinAndSelect('contest.participants', 'participants')
       .leftJoinAndSelect('participants.user', 'participantUser')
       .leftJoinAndSelect('contest.winners', 'winners')
-      .leftJoinAndSelect('winners.user', 'winnerUser')
       .leftJoinAndSelect('contest.allowedGroups', 'allowedGroups')
       .leftJoinAndSelect('contest.requiredGroups', 'requiredGroups')
-      .where('contest.id = :id', { id })
-      .getOne();
+      .getMany();
   }
+
+  async getContestById(id: number): Promise<any> {
+    const contest = await this.contestRepo.query(
+      `SELECT id, status FROM contests WHERE id = $1`,
+      [id],
+    );
+
+    if (!contest[0]) return null;
+
+    const [allowedGroups, requiredGroups] = await Promise.all([
+      this.contestRepo.query(
+        `SELECT id, name, "telegramId", "telegramName" 
+       FROM channels 
+       JOIN contest_allowed_channels cac ON cac."channelId" = channels.id
+       WHERE cac."contestId" = $1`,
+        [id],
+      ),
+      this.contestRepo.query(
+        `SELECT id, name, "telegramId", "telegramName" 
+       FROM channels 
+       JOIN contest_required_channels crc ON crc."channelId" = channels.id
+       WHERE crc."contestId" = $1`,
+        [id],
+      ),
+    ]);
+
+    return {
+      ...contest[0],
+      allowedGroups,
+      requiredGroups,
+    };
+  }
+
 
   saveContest(data) {
     //this.logger.log('Сохранение конкурса в базу', data);
