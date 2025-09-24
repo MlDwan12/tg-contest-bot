@@ -32,9 +32,9 @@ export class ContestParticipationController {
       groupId: number;
     },
   ) {
-    this.logger.log(
-      `Регистрация участия пользователя ${dto.userName} в конкурсе id=${dto.contestId}`,
-    );
+    // //this.logger.log(
+    //   `Регистрация участия пользователя ${dto.userName} в конкурсе id=${dto.contestId}`,
+    // );
 
     if (!dto.contestId) {
       this.logger.warn(`Попытка зарегистрировать участие без contestId`);
@@ -58,10 +58,10 @@ export class ContestParticipationController {
       userName: dto.userName,
     });
 
-    this.logger.log(
-      `Пользователь ${user.username} найден/создан с telegramId=${user.telegramId}`,
-    );
-    this.logger.log(`Регистрация участия в группе id=${dto.groupId}`);
+    // //this.logger.log(
+    //   `Пользователь ${user.username} найден/создан с telegramId=${user.telegramId}`,
+    // );
+    //this.logger.log(`Регистрация участия в группе id=${dto.groupId}`);
 
     const participation =
       await this.contestParticipationService.registerParticipation(
@@ -71,9 +71,9 @@ export class ContestParticipationController {
         dto.groupId,
       );
 
-    this.logger.log(
-      `Участие зарегистрировано: userId=${user.id}, contestId=${contest.id}`,
-    );
+    // //this.logger.log(
+    //   `Участие зарегистрировано: userId=${user.id}, contestId=${contest.id}`,
+    // );
     return participation;
   }
 }

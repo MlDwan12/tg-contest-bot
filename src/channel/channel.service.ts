@@ -17,9 +17,9 @@ export class ChannelService {
 
   async create(createChannelDto: CreateChannelDto): Promise<Channel> {
     try {
-      this.logger.log(
-        `Попытка создать канал: ${JSON.stringify(createChannelDto)}`,
-      );
+      // //this.logger.log(
+      //   `Попытка создать канал: ${JSON.stringify(createChannelDto)}`,
+      // );
 
       const isExistChannel = await this.channelRepository.exists({
         where: { telegramName: createChannelDto.telegramName },
@@ -68,7 +68,7 @@ export class ChannelService {
       });
 
       const saved = await this.channelRepository.save(channel);
-      this.logger.log(`✅ Канал создан: ${saved.telegramId} (${saved.name})`);
+      //this.logger.log(`✅ Канал создан: ${saved.telegramId} (${saved.name})`);
 
       return saved;
     } catch (error) {
@@ -90,7 +90,7 @@ export class ChannelService {
 
   async findAll(): Promise<Channel[]> {
     try {
-      this.logger.log('Запрос списка всех каналов');
+      //this.logger.log('Запрос списка всех каналов');
       return await this.channelRepository.find();
     } catch (error) {
       this.logger.error(
@@ -106,7 +106,7 @@ export class ChannelService {
 
   async findMany(ids: string[]): Promise<Channel[]> {
     try {
-      this.logger.log(`Поиск каналов по id: ${ids.join(', ')}`);
+      // //this.logger.log(`Поиск каналов по id: ${ids.join(', ')}`);
       return await this.channelRepository.findBy({ telegramId: In(ids) });
     } catch (error) {
       this.logger.error(
@@ -142,7 +142,7 @@ export class ChannelService {
         throw new HttpException('Канал не найден', HttpStatus.NOT_FOUND);
       }
 
-      this.logger.log(`✅ Канал telegramId=${telegramId} удалён`);
+      // //this.logger.log(`✅ Канал telegramId=${telegramId} удалён`);
     } catch (error) {
       this.logger.error(
         `Ошибка при удалении канала: ${error.message}`,

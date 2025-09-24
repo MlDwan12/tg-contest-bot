@@ -13,7 +13,7 @@ export class QueueService implements OnModuleInit {
   async onModuleInit() {
     try {
       await (await this.postEditQueue.client).ping();
-      this.logger.log('✅ Redis connection OK');
+      //this.logger.log('✅ Redis connection OK');
     } catch (err) {
       this.logger.error('❌ Redis connection failed', err);
     }

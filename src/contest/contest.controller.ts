@@ -30,13 +30,15 @@ export class ContestController {
 
   @Get()
   getAll(): Promise<Contest[]> {
-    this.logger.log('Получен запрос: список всех конкурсов');
+    //this.logger.log('Получен запрос: список всех конкурсов');
     return this.contestService.getContests();
   }
 
   @Get(':id')
-  getById(@Param('id', ParseIntPipe) id: number): Promise<Contest | null> {
-    this.logger.log(`Получен запрос: конкурс id=${id}`);
+  getById(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<Contest | null | undefined> {
+    // //this.logger.log(`Получен запрос: конкурс id=${id}`);
     return this.contestService.getContestById(id);
   }
 
@@ -63,7 +65,7 @@ export class ContestController {
     @Body() dto: CreateContestDto,
     @UploadedFile() image?: Express.Multer.File,
   ): Promise<Contest> {
-    this.logger.log(`Создание конкурса пользователем id=${userId}`);
+    // //this.logger.log(`Создание конкурса пользователем id=${userId}`);
     if (image) dto.imageUrl = `/uploads/${image.filename}`;
     if (userId) dto.creatorId = userId;
 
@@ -99,7 +101,7 @@ export class ContestController {
     @Body() dto: UpdateContestDto,
     @UploadedFile() image?: Express.Multer.File,
   ) {
-    this.logger.log(`Обновление конкурса id=${id}`);
+    // //this.logger.log(`Обновление конкурса id=${id}`);
     if (image) dto['imageUrl'] = `/uploads/${image.filename}`;
     return this.contestService.updateContest(id, dto);
   }

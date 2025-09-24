@@ -47,9 +47,9 @@ export class UsersService {
     });
 
     if (user) {
-      this.logger.log(
-        `Пользователь найден: id=${user.id}, username=${user.username}`,
-      );
+      // //this.logger.log(
+      //   `Пользователь найден: id=${user.id}, username=${user.username}`,
+      // );
       return user;
     }
 
@@ -61,9 +61,9 @@ export class UsersService {
       user = await this.userRepo.save(
         this.userRepo.create({ telegramId, username }),
       );
-      this.logger.log(
-        `Новый пользователь создан: id=${user.id}, username=${user.username}`,
-      );
+      // //this.logger.log(
+      //   `Новый пользователь создан: id=${user.id}, username=${user.username}`,
+      // );
     } catch (error) {
       this.logger.error(
         `Ошибка при создании пользователя telegramId=${telegramId}: ${error.message}`,
@@ -102,9 +102,9 @@ export class UsersService {
       order: { id: 'ASC' },
     });
 
-    this.logger.log(
-      `Найдено пользователей: count=${users.length}, total=${total}`,
-    );
+    // //this.logger.log(
+    //   `Найдено пользователей: count=${users.length}, total=${total}`,
+    // );
     return { users, total };
   }
 
@@ -149,8 +149,6 @@ export class UsersService {
 
     const userMap: Record<number, any> = {};
     users.forEach((u) => {
-      console.log(u);
-
       userMap[u.id] = {
         id: u.id,
         username: u.username,
@@ -191,7 +189,7 @@ export class UsersService {
 
   async broadcast(dto: BroadcastDto) {
     try {
-      this.logger.log(`broadcast: старт, параметры=${JSON.stringify(dto)}`);
+      //this.logger.log(`broadcast: старт, параметры=${JSON.stringify(dto)}`);
 
       let targets: { telegramId: string }[] | number[] = [];
 
@@ -212,13 +210,6 @@ export class UsersService {
       const messageId = contest?.telegramMessageIds
         ?.find((msg) => msg.split(':')[0] === channel?.telegramId)
         ?.split(':')[1];
-
-      console.log(
-        'messageId, contest, channel=====>',
-        messageId,
-        contest,
-        channel,
-      );
 
       if (dto.type === BroadcastType.USER) {
         // 🔹 одному пользователю
@@ -243,7 +234,7 @@ export class UsersService {
           messageId && !dto.imageUrl ? contest.imageUrl : dto.imageUrl,
         );
         targets = [{ telegramId: user.telegramId }];
-        this.logger.log(`broadcast: режим=USER, userId=${user.telegramId}`);
+        //this.logger.log(`broadcast: режим=USER, userId=${user.telegramId}`);
       }
 
       if (dto.type === BroadcastType.GROUP) {
@@ -252,7 +243,6 @@ export class UsersService {
           'telegramId',
           dto.channels!.split(','),
         );
-        console.log('Поиск каналы ====>', channels);
 
         if (!channels) {
           this.logger.warn(
@@ -265,7 +255,6 @@ export class UsersService {
           'groupId',
           channels.map((c) => Number(c.telegramId)),
         );
-        console.log('Users в каналах', users);
 
         const uniqueUsers = Array.from(
           new Map(users.map((u) => [u.user.telegramId, u.user])).values(),
@@ -294,16 +283,16 @@ export class UsersService {
                   messageId && !dto.imageUrl ? contest.imageUrl : dto.imageUrl,
                 )
                 .then(() => {
-                  this.logger.log(
-                    `Сообщение отправлено пользователю telegramId=${u.telegramId}`,
-                  );
+                  // //this.logger.log(
+                  //   `Сообщение отправлено пользователю telegramId=${u.telegramId}`,
+                  // );
                 }),
             ),
         );
 
-        this.logger.log(
-          `broadcast: режим=GROUP, group=${dto.channelId}, пользователей=${targets.length}`,
-        );
+        // //this.logger.log(
+        //   `broadcast: режим=GROUP, group=${dto.channelId}, пользователей=${targets.length}`,
+        // );
       }
 
       if (dto.type === BroadcastType.ALL) {
@@ -328,20 +317,20 @@ export class UsersService {
                 messageId,
                 messageId && !dto.imageUrl ? contest.imageUrl : dto.imageUrl,
               );
-              this.logger.log(
-                `Сообщение отправлено пользователю telegramId=${u.telegramId}`,
-              );
+              // //this.logger.log(
+              //   `Сообщение отправлено пользователю telegramId=${u.telegramId}`,
+              // );
               return u.telegramId; // возвращаем telegramId из промиса
             }),
         );
 
         // теперь targets — это массив всех отправленных telegramId
-        this.logger.log(
-          `Сообщения отправлены пользователям: ${targets.join(',')}`,
-        );
-        this.logger.log(
-          `broadcast: режим=ALL, пользователей=${targets.length}`,
-        );
+        // //this.logger.log(
+        //   `Сообщения отправлены пользователям: ${targets.join(',')}`,
+        // );
+        // //this.logger.log(
+        //   `broadcast: режим=ALL, пользователей=${targets.length}`,
+        // );
       }
 
       return { success: true, total: targets.length };

@@ -14,7 +14,7 @@ export class PostEditProcessor extends WorkerHost {
   }
 
   async process(job: Job<any, any, string>): Promise<any> {
-    this.logger.log(`Начало обработки задачи: ${job.id}, name=${job.name}`);
+    //this.logger.log(`Начало обработки задачи: ${job.id}, name=${job.name}`);
     this.logger.debug(`Данные задачи: ${JSON.stringify(job.data)}`);
     this.logger.debug(`Счетчик ===> : ${job.data.clickCount}`);
 

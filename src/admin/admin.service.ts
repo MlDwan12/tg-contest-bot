@@ -16,7 +16,7 @@ export class AdminService {
 
   async create(createAdminDto: CreateAdminDto) {
     try {
-      this.logger.log(`Попытка создать админа: ${createAdminDto.userName}`);
+      // //this.logger.log(`Попытка создать админа: ${createAdminDto.userName}`);
 
       const isExist = await this.adminRepository.findOne({
         where: { userName: createAdminDto.userName },
@@ -41,9 +41,9 @@ export class AdminService {
 
       await this.adminRepository.save(newAdmin);
 
-      this.logger.log(
-        `✅ Админ создан: id=${newAdmin.id}, userName=${newAdmin.userName}`,
-      );
+      // //this.logger.log(
+      //   `✅ Админ создан: id=${newAdmin.id}, userName=${newAdmin.userName}`,
+      // );
       return newAdmin;
     } catch (error: any) {
       this.logger.error(
@@ -65,7 +65,7 @@ export class AdminService {
 
   async findAll() {
     try {
-      this.logger.log(`Запрос списка администраторов`);
+      // //this.logger.log(`Запрос списка администраторов`);
       return await this.adminRepository.find({ select: { password: false } });
     } catch (error: any) {
       this.logger.error(
@@ -81,7 +81,7 @@ export class AdminService {
 
   async findOne(options: Partial<Admin>) {
     try {
-      this.logger.log(`Поиск админа по параметрам: ${JSON.stringify(options)}`);
+      //this.logger.log(`Поиск админа по параметрам: ${JSON.stringify(options)}`);
       const admin = await this.adminRepository.findOne({
         where: options,
         select: { password: false },
@@ -116,7 +116,7 @@ export class AdminService {
         );
       }
 
-      this.logger.log(`✅ Админ с id=${id} успешно удален`);
+      //this.logger.log(`✅ Админ с id=${id} успешно удален`);
       return { message: `Админ с id=${id} удален` };
     } catch (error: any) {
       this.logger.error(`Ошибка при удалении админа id=${id}`, error.stack);

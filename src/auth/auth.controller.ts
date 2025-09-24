@@ -29,7 +29,7 @@ export class AuthController {
     @Body() body: { userName: string; password: string },
     @Res({ passthrough: true }) res: Response,
   ) {
-    this.logger.log(`Попытка входа: ${body.userName}`);
+    //this.logger.log(`Попытка входа: ${body.userName}`);
 
     const user = await this.authService.validateUser(
       body.userName,
@@ -63,7 +63,7 @@ export class AuthController {
     });
     console.log(12331212);
 
-    this.logger.log(`Успешный вход: ${user.userName}`);
+    //this.logger.log(`Успешный вход: ${user.userName}`);
 
     return { name: user.userName, id: user.id };
   }
@@ -72,7 +72,7 @@ export class AuthController {
   logout(@Res({ passthrough: true }) res: Response) {
     res.clearCookie('access_token');
     res.clearCookie('refresh_token');
-    this.logger.log('Пользователь вышел из системы');
+    //this.logger.log('Пользователь вышел из системы');
     return { message: 'Logout successful' };
   }
 }

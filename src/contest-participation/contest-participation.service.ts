@@ -32,24 +32,24 @@ export class ContestParticipationService {
     status: 'verified' | 'winner' = 'verified',
     groupId: number,
   ): Promise<{ data: [] } | ContestParticipation[]> {
-    this.logger.log(
-      `Регистрация участия пользователя ${user.username} в конкурсе ${contest.name} (contestId=${contest.id})`,
-    );
+    // //this.logger.log(
+    //   `Регистрация участия пользователя ${user.username} в конкурсе ${contest.name} (contestId=${contest.id})`,
+    // );
 
     // Проверка подписки
     await this.telegramService.isUserSubscribed(
       contest.requiredGroups,
       Number(user.telegramId),
     );
-    this.logger.log(
-      `Проверка подписки пользователя ${user.telegramId} завершена`,
-    );
+    // //this.logger.log(
+    //   `Проверка подписки пользователя ${user.telegramId} завершена`,
+    // );
 
     if (contest.status === 'completed') {
       const winners = contest.participants.filter((p) => p.status === 'winner');
-      this.logger.log(
-        `Конкурс уже завершен, возвращаем победителей: ${winners.map((p) => p.user.id)}`,
-      );
+      // //this.logger.log(
+      //   `Конкурс уже завершен, возвращаем победителей: ${winners.map((p) => p.user.id)}`,
+      // );
       return winners;
     }
 
@@ -58,9 +58,9 @@ export class ContestParticipationService {
     });
 
     if (exists) {
-      this.logger.log(
-        `Участие пользователя ${user.id} уже существует, обновляем статус`,
-      );
+      // //this.logger.log(
+      //   `Участие пользователя ${user.id} уже существует, обновляем статус`,
+      // );
       exists.status = status;
       await this.participationRepo.save(exists);
       return [];
@@ -73,24 +73,14 @@ export class ContestParticipationService {
       groupId,
     });
     await this.participationRepo.save(participation);
-    this.logger.log(
-      `Участие пользователя ${user.id} создано с id=${participation.id}`,
-    );
+    // //this.logger.log(
+    //   `Участие пользователя ${user.id} создано с id=${participation.id}`,
+    // );
 
     if (contest.telegramMessageIds?.length) {
       await Promise.all(
         contest.telegramMessageIds.map(async (e) => {
           const [channel, message] = e.split(':');
-
-          // await this.telegramService.editPost(
-          //   channel,
-          //   Number(message),
-          //   contest,
-          //   undefined,
-          //   undefined,
-          //   undefined,
-          //   contest.buttonText,
-          // );
 
           await this.telegramService.editPostQueue(
             channel,
@@ -109,8 +99,6 @@ export class ContestParticipationService {
   }
 
   async updatePlace(id: string, contestId: number, place: number) {
-    console.log(id, contestId, place);
-
     const participation = await this.participationRepo.findOne({
       where: { user: { telegramId: id }, contest: { id: contestId } },
       relations: ['contest', 'user'],
@@ -126,9 +114,9 @@ export class ContestParticipationService {
   }
 
   async updateWinner(ids: number[], contestId: number) {
-    this.logger.log(
-      `Обновление победителей для конкурса id=${contestId}, ids=${ids}`,
-    );
+    // //this.logger.log(
+    //   `Обновление победителей для конкурса id=${contestId}, ids=${ids}`,
+    // );
 
     const contest = await this.contestService.getContestById(contestId);
     const participants = await this.participationRepo.find({
@@ -138,23 +126,22 @@ export class ContestParticipationService {
       },
       relations: { contest: true, user: true },
     });
-    console.log('ПОЛУЧЕНИЕ ДАННЫХ ПОБЕДИТЕЛЕЙ======>', participants);
 
     if (!contest) {
       this.logger.warn(`Конкурс id=${contestId} не найден`);
       throw new HttpException('Конкурс не найден', HttpStatus.NOT_FOUND);
     }
 
-    this.logger.log(
-      `Найдено участников для обновления: ${participants.map((p) => p.id)}`,
-    );
+    // //this.logger.log(
+    //   `Найдено участников для обновления: ${participants.map((p) => p.id)}`,
+    // );
 
     const participantsUpdate = participants;
 
     if (contest.winnerStrategy === 'manual' && !contest.winners.length) {
       contest.winnerStrategy = 'random';
       await this.contestService.saveContest(contest);
-      this.logger.log(`Стратегия победителей установлена в random`);
+      //this.logger.log(`Стратегия победителей установлена в random`);
     }
 
     if (contest.winners.length) {
@@ -166,9 +153,9 @@ export class ContestParticipationService {
         if (participant) {
           participant.status = 'winner';
           participant.prizePlace = i;
-          this.logger.log(
-            `Победитель обновлен: userId=${participant.user.id}, prizePlace=${i}`,
-          );
+          // //this.logger.log(
+          //   `Победитель обновлен: userId=${participant.user.id}, prizePlace=${i}`,
+          // );
         }
         i++;
       });
@@ -176,16 +163,16 @@ export class ContestParticipationService {
       for (let i = 0; i < participantsUpdate.length; i++) {
         participantsUpdate[i].status = 'winner';
         participantsUpdate[i].prizePlace = i + 1;
-        this.logger.log(
-          `Победитель назначен: userId=${participantsUpdate[i].user.id}, prizePlace=${i + 1}`,
-        );
+        // //this.logger.log(
+        //   `Победитель назначен: userId=${participantsUpdate[i].user.id}, prizePlace=${i + 1}`,
+        // );
       }
     }
 
     const updated = await this.participationRepo.save(participantsUpdate);
-    this.logger.log(
-      `Обновление победителей завершено, участников обновлено: ${updated.length}`,
-    );
+    // //this.logger.log(
+    //   `Обновление победителей завершено, участников обновлено: ${updated.length}`,
+    // );
     return updated;
   }
 

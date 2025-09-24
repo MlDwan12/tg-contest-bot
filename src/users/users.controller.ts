@@ -38,11 +38,11 @@ export class UsersController {
     type: User,
   })
   async create(@Body() dto: CreateUserDto): Promise<User> {
-    this.logger.log(
-      `Создание пользователя: telegramId=${dto.telegramId}, username=${dto.userName}`,
-    );
+    // //this.logger.log(
+    //   `Создание пользователя: telegramId=${dto.telegramId}, username=${dto.userName}`,
+    // );
     const user = await this.usersService.findOrCreate(dto);
-    this.logger.log(`Пользователь успешно создан/найден: id=${user.id}`);
+    //this.logger.log(`Пользователь успешно создан/найден: id=${user.id}`);
     return user;
   }
 
@@ -84,9 +84,9 @@ export class UsersController {
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 50,
   ) {
-    this.logger.log(
-      `Запрос списка пользователей, page=${page}, limit=${limit}`,
-    );
+    // //this.logger.log(
+    //   `Запрос списка пользователей, page=${page}, limit=${limit}`,
+    // );
     const users = await this.usersService.getUsersStats();
 
     return users;

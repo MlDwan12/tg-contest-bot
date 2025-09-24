@@ -31,9 +31,9 @@ export class ContestUpdate {
     const tgUser = ctx.from;
     const chatId = ctx.chat?.id;
 
-    this.logger.log(
-      `Bot started by chatId=${chatId}, user=${tgUser?.username}`,
-    );
+    // //this.logger.log(
+    //   `Bot started by chatId=${chatId}, user=${tgUser?.username}`,
+    // );
 
     if (tgUser) {
       await this.userService.findOrCreate({
@@ -48,7 +48,7 @@ export class ContestUpdate {
       );
     } else if (ctx.channelPost) {
       const channelId = ctx.channelPost.chat.id;
-      this.logger.log(`Channel post detected, channelId=${channelId}`);
+      //this.logger.log(`Channel post detected, channelId=${channelId}`);
       await ctx.reply(`ID этого канала: ${channelId}`);
     } else {
       this.logger.warn('Не удалось определить пользователя Telegram или канал');
@@ -60,7 +60,7 @@ export class ContestUpdate {
 
   @Command('contests')
   async list(@Ctx() ctx: Context) {
-    this.logger.log('Команда /contests вызвана');
+    //this.logger.log('Команда /contests вызвана');
     const contests = await this.contestService.getActiveContests();
     if (!contests.length) return ctx.reply('Нет активных конкурсов');
 
@@ -75,7 +75,7 @@ export class ContestUpdate {
 
   @Command('createcontest')
   async startCreate(@Ctx() ctx: Context & { session: CreateContestSession }) {
-    this.logger.log('Начато создание конкурса');
+    //this.logger.log('Начато создание конкурса');
     ctx.session = { step: 'name' };
     await ctx.reply('✍️ Введите название конкурса:');
   }
@@ -86,20 +86,20 @@ export class ContestUpdate {
     const text = message.text?.trim();
     if (!text) return;
 
-    this.logger.log(`Получено сообщение: ${text}`);
+    //this.logger.log(`Получено сообщение: ${text}`);
 
     if (ctx.session?.step) {
       switch (ctx.session.step) {
         case 'name':
           ctx.session.name = text;
           ctx.session.step = 'description';
-          this.logger.log(`Название конкурса установлено: ${text}`);
+          //this.logger.log(`Название конкурса установлено: ${text}`);
           await ctx.reply('📄 Теперь введите описание конкурса:');
           return;
 
         case 'description': {
           ctx.session.description = text;
-          this.logger.log(`Описание конкурса установлено: ${text}`);
+          //this.logger.log(`Описание конкурса установлено: ${text}`);
 
           if (!ctx.session.name) {
             this.logger.warn('Название конкурса не задано');
@@ -118,9 +118,9 @@ export class ContestUpdate {
             buttonText: 'Участвовать',
           });
 
-          this.logger.log(
-            `Создан конкурс id=${contest.id}, name=${contest.name}`,
-          );
+          // //this.logger.log(
+          //   `Создан конкурс id=${contest.id}, name=${contest.name}`,
+          // );
 
           const postText = `🎉 Новый конкурс!\n\n<b>${contest.name}</b>\n\n${contest.description}`;
           await ctx.reply(postText, {
@@ -153,7 +153,7 @@ export class ContestUpdate {
     if (!ctx.match) return await ctx.answerCbQuery('❌ Неверные данные');
 
     const contestId = Number(ctx.match[1]);
-    this.logger.log(`Публикация конкурса id=${contestId}`);
+    //this.logger.log(`Публикация конкурса id=${contestId}`);
 
     const contest = await this.contestService.getContestById(contestId);
 
@@ -175,7 +175,7 @@ export class ContestUpdate {
     ctx: Context & { match?: RegExpExecArray; session?: CreateContestSession },
   ) {
     const contestId = Number(ctx.match?.[1]);
-    this.logger.log(`Отложенная публикация конкурса id=${contestId}`);
+    //this.logger.log(`Отложенная публикация конкурса id=${contestId}`);
 
     const contest = await this.contestService.getContestById(contestId);
     if (!contest) {
