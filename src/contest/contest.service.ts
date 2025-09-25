@@ -164,35 +164,54 @@ export class ContestService {
 
     if (!contest[0]) return null;
 
-    const [allowedGroups, requiredGroups, winners] = await Promise.all([
-      this.contestRepo.query(
-        `SELECT id, name, "telegramId", "telegramName" 
+    const [allowedGroups, requiredGroups, winners, participations] =
+      await Promise.all([
+        this.contestRepo.query(
+          `SELECT id, name, "telegramId", "telegramName" 
        FROM channels 
        JOIN contest_allowed_channels cac ON cac."channelId" = channels.id
        WHERE cac."contestId" = $1`,
-        [id],
-      ),
-      this.contestRepo.query(
-        `SELECT id, name, "telegramId", "telegramName" 
+          [id],
+        ),
+        this.contestRepo.query(
+          `SELECT id, name, "telegramId", "telegramName" 
        FROM channels 
        JOIN contest_required_channels crc ON crc."channelId" = channels.id
        WHERE crc."contestId" = $1`,
-        [id],
-      ),
-      this.contestRepo.query(
-        `SELECT cw.id, cw."userId", u."telegramId", u."username"
+          [id],
+        ),
+        this.contestRepo.query(
+          `SELECT cw.id, cw."userId", u."telegramId", u."username"
      FROM contest_winner cw
      JOIN users u ON u.id = cw."userId"
      WHERE cw."contestId" = $1`,
-        [id],
-      ),
-    ]);
+          [id],
+        ),
+        this.contestRepo.query(
+          `SELECT 
+  json_build_object(
+    'id', u.id,
+    'username', u.username,
+    'telegramId', u."telegramId",
+    'firstName', u."firstName",
+    'lastName', u."lastName"
+  ) AS "user",
+  cp."prizePlace",
+  cp."status",
+  cp."groupId"
+FROM contest_participations cp
+JOIN users u ON u.id = cp."userId"
+WHERE cp."contestId" = $1;`,
+          [id],
+        ),
+      ]);
 
     return {
       ...contest[0],
       allowedGroups,
       requiredGroups,
       winners,
+      participations,
     };
   }
 
