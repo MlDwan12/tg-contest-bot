@@ -298,6 +298,7 @@ export class CronService {
     // );
 
     if (!task) return;
+    console.log('getContestById======> ', task.referenceId);
 
     const contest = await this.contestService.getContestById(task.referenceId);
     if (!contest) {
@@ -307,6 +308,8 @@ export class CronService {
 
     try {
       if (task.type === ScheduledTaskType.POST_PUBLISH) {
+        console.log('contest.name=====>', contest.name);
+
         //this.logger.log(`Немедленное выполнение задачи публикации`);
         const channels = contest.allowedGroups;
         const telegramMessageIds: string[] = [];

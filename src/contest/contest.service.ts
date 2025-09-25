@@ -158,7 +158,7 @@ export class ContestService {
 
   async getContestById(id: number): Promise<any> {
     const contest = await this.contestRepo.query(
-      `SELECT id, status FROM contests WHERE id = $1`,
+      `SELECT * FROM contests WHERE id = $1`,
       [id],
     );
 
@@ -202,7 +202,7 @@ export class ContestService {
   }
 
   async createContest(dto: CreateContestDto): Promise<Contest> {
-    //this.logger.log(`Создание нового конкурса: ${dto.name}`);
+    this.logger.log(`Создание нового конкурса: `, dto);
 
     const allowedChannels = dto.allowedGroups
       ? await this._channelService.findMany(
