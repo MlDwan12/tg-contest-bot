@@ -34,6 +34,9 @@ import { QueueModule } from './queue/queue.module';
         database: configService.get('DATABASE_NAME'),
         autoLoadEntities: true,
         synchronize: false,
+        extra: {
+          max: 50, // по умолчанию часто меньше
+        },
       }),
       inject: [ConfigService],
     }),

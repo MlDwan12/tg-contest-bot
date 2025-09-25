@@ -6,6 +6,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsersModule } from 'src/users/users.module';
 import { ContestModule } from 'src/contest/contest.module';
 import { TelegramModule } from 'src/telegram/telegram.module';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
@@ -13,6 +14,9 @@ import { TelegramModule } from 'src/telegram/telegram.module';
     forwardRef(() => TelegramModule),
     forwardRef(() => ContestModule),
     forwardRef(() => UsersModule),
+    BullModule.registerQueue({
+      name: 'telegram',
+    }),
   ],
   controllers: [ContestParticipationController],
   providers: [ContestParticipationService],

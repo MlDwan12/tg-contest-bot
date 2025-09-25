@@ -156,7 +156,7 @@ export class TelegramService {
     //   `Проверка подписки пользователя ${telegramId} в ${chats.length} чатах`,
     // );
     const results: { chat: string; subscribed: boolean }[] = [];
-console.log(chats);
+    console.log(chats);
 
     for (const chat of chats) {
       try {
@@ -366,7 +366,7 @@ console.log(chats);
         return result as TextMessage | PhotoMessage | true | undefined;
       }
 
-      if (contest?.imageUrl) {
+      if (newImageUrl) {
         //this.logger.log(`Редактируем caption фото сообщения ${messageId}`);
         const result = await this.bot.telegram.editMessageCaption(
           Number(channelId),

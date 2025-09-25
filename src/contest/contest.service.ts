@@ -164,7 +164,7 @@ export class ContestService {
 
     if (!contest[0]) return null;
 
-    const [allowedGroups, requiredGroups] = await Promise.all([
+    const [allowedGroups, requiredGroups, winners] = await Promise.all([
       this.contestRepo.query(
         `SELECT id, name, "telegramId", "telegramName" 
        FROM channels 
@@ -179,15 +179,22 @@ export class ContestService {
        WHERE crc."contestId" = $1`,
         [id],
       ),
+      this.contestRepo.query(
+        `SELECT cw.id, cw."userId", u."telegramId", u."username"
+     FROM contest_winner cw
+     JOIN users u ON u.id = cw."userId"
+     WHERE cw."contestId" = $1`,
+        [id],
+      ),
     ]);
 
     return {
       ...contest[0],
       allowedGroups,
       requiredGroups,
+      winners,
     };
   }
-
 
   saveContest(data) {
     //this.logger.log('Сохранение конкурса в базу', data);
@@ -612,7 +619,7 @@ export class ContestService {
   async completeContest(contestId: number): Promise<void> {
     const contest = await this.contestRepo.findOne({
       where: { id: contestId },
-      relations: { winners: true, allowedGroups: true },
+      relations: { winners: true, allowedGroups: true, participants: true },
     });
 
     if (!contest) {

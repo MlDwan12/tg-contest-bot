@@ -13,6 +13,8 @@ import { Contest } from 'src/contest/entities/contest.entity';
 import { User } from 'src/users/entities/user.entity';
 import { TelegramService } from 'src/telegram/telegram.service';
 import { ContestService } from 'src/contest/contest.service';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 
 @Injectable()
 export class ContestParticipationService {
@@ -24,6 +26,7 @@ export class ContestParticipationService {
     private readonly telegramService: TelegramService,
     @Inject(forwardRef(() => ContestService))
     private contestService: ContestService,
+    @InjectQueue('telegram') private readonly telegramQueue: Queue,
   ) {}
 
   async registerParticipation(
@@ -32,17 +35,34 @@ export class ContestParticipationService {
     status: 'verified' | 'winner' = 'verified',
     groupId: number,
   ): Promise<ContestParticipation[] | { data: [] }> {
-    await this.telegramService.isUserSubscribed(
-      contest.requiredGroups,
-      Number(user.telegramId),
-    );
+    // await this.telegramService.isUserSubscribed(
+    //   contest.requiredGroups,
+    //   Number(user.telegramId),
+    // );
+
+    this.telegramQueue.add('checkSubscription', {
+      telegramId: user.telegramId,
+      requiredGroups: contest.requiredGroups,
+    });
+
+    // if (contest.status === 'completed') {
+    //   const winners = await this.participationRepo.find({
+    //     where: { contest: { id: contest.id }, status: 'winner' },
+    //     relations: { user: true },
+    //     select: ['id', 'status', 'user', 'contest'],
+    //   });
+    //   return winners;
+    // }
 
     if (contest.status === 'completed') {
-      const winners = await this.participationRepo.find({
-        where: { contest: { id: contest.id }, status: 'winner' },
-        relations: { user: true },
-        select: ['id', 'status', 'user', 'contest'],
-      });
+      const winners = await this.participationRepo.query(
+        `
+      SELECT id, "userId", "contestId", status
+      FROM contest_participations
+      WHERE "contestId" = $1 AND status = 'winner'
+    `,
+        [contest.id],
+      );
       return winners;
     }
 
@@ -60,16 +80,11 @@ export class ContestParticipationService {
     if (contest.telegramMessageIds?.length) {
       contest.telegramMessageIds.forEach((e) => {
         const [channel, message] = e.split(':');
-        this.telegramService.editPostQueue(
+        this.telegramQueue.add('editPost', {
           channel,
-          Number(message),
-          contest,
-          undefined,
-          undefined,
-          undefined,
-          contest.buttonText,
-          false,
-        );
+          messageId: Number(message),
+          contestId: contest.id,
+        });
       });
     }
 

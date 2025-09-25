@@ -64,3 +64,32 @@ export class PostEditProcessor extends WorkerHost {
     }
   }
 }
+
+@Injectable()
+@Processor('subscription-check') // новая очередь
+export class SubscriptionCheckProcessor extends WorkerHost {
+  private readonly logger = new Logger(SubscriptionCheckProcessor.name);
+
+  constructor(private readonly telegramService: TelegramService) {
+    super();
+  }
+
+  async process(job: Job<any, any, string>): Promise<any> {
+    const { telegramId, requiredGroups } = job.data;
+    this.logger.debug(`Проверка подписки для telegramId=${telegramId}`);
+
+    try {
+      const isSubscribed = await this.telegramService.isUserSubscribed(
+        requiredGroups,
+        Number(telegramId),
+      );
+      return { telegramId, isSubscribed };
+    } catch (error) {
+      this.logger.error(
+        `Ошибка проверки подписки для telegramId=${telegramId}: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+}

@@ -297,6 +297,8 @@ export class CronService {
     //   `Немедленное выполнение задачи: ${task.type}-${task.referenceId}`,
     // );
 
+    if (!task) return;
+
     const contest = await this.contestService.getContestById(task.referenceId);
     if (!contest) {
       this.logger.error(`Конкурс ${task.referenceId} не найден`);

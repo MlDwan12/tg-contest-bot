@@ -77,15 +77,15 @@ export class UsersService {
 
     // const telegramId = String(tgUser.telegramId);
     // const username = tgUser.userName;
-    //спорный момент пропуск в 2 раза ниже но потребление памяти в 2 раза ниже
+    // спорный момент пропуск в 2 раза ниже но потребление памяти в 2 раза ниже
     const [user] = await this.userRepo.query(
       `
-      INSERT INTO users("telegramId", "username")
-      VALUES ($1, $2)
-      ON CONFLICT("telegramId") DO UPDATE
-      SET "username" = EXCLUDED."username"
-      RETURNING id, "telegramId", "username"
-    `,
+        INSERT INTO users("telegramId", "username")
+        VALUES ($1, $2)
+        ON CONFLICT("telegramId") DO UPDATE
+        SET "username" = EXCLUDED."username"
+        RETURNING id, "telegramId", "username"
+      `,
       [telegramId, username],
     );
 
