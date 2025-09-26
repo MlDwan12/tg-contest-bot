@@ -89,7 +89,7 @@ export class CronService {
       if (runAt <= now && task.status === ScheduledTaskStatus.PENDING) {
         // просрочено — запускаем немедленно
         //this.logger.log(`Просроченная задача ${jobName}, запускаем немедленно`);
-        await this.executeTask(task); // нужно, чтобы у тебя был метод выполнить задачу сразу
+        // await this.executeTask(task); // нужно, чтобы у тебя был метод выполнить задачу сразу
       } else {
         // запланировано на будущее
         //this.logger.log(`Запланирована задача ${jobName} на ${runAt}`);
@@ -108,7 +108,7 @@ export class CronService {
       // //this.logger.log(
       //   `Выполнение задачи: ${task.type} для referenceId: ${task.referenceId}`,
       // );
-      const contest = await this.contestService.getContestById(
+      const contest: any = await this.contestService.getContestByIdWin(
         task.referenceId,
       );
 
@@ -175,7 +175,7 @@ export class CronService {
             `Статус конкурса ${contest.id} установлен на 'completed'`,
           );
 
-          const winners = await this.contestService.getWinners(contest.id);
+          const winners = await this.contestService.getWinners(contest);
           this.logger.log(`Найдено ${winners.length} победителей`);
 
           if (winners.length) {
@@ -340,20 +340,20 @@ export class CronService {
     }
   }
 
-  public async executeTask(task: ScheduledTask) {
+  public async executeTask(task: ScheduledTask, contest: any) {
     // if (!task) return;
     console.log(123);
 
     this.logger.debug(
-      `Начало выполнения задачи: ${task.type}-${task.referenceId}`,
+      `Начало выполнения задачи: ${task?.type}-${task?.referenceId}`,
     );
     console.log('getContestById======> ', task.referenceId);
 
-    const contest = await this.contestService.getContestById(task.referenceId);
-    if (!contest) {
-      this.logger.error(`Конкурс ${task.referenceId} не найден`);
-      return;
-    }
+    // const contest = await this.contestService.getContestById(task.referenceId);
+    // if (!contest) {
+    //   this.logger.error(`Конкурс ${task.referenceId} не найден`);
+    //   return;
+    // }
 
     try {
       // --- Публикация поста ---
@@ -388,6 +388,8 @@ export class CronService {
 
       // --- Завершение конкурса ---
       if (task.type === ScheduledTaskType.CONTEST_FINISH) {
+        console.log(1111, contest);
+
         await this.handleContestCompletion(contest);
       }
 
@@ -396,17 +398,17 @@ export class CronService {
       await this.scheduledTaskRepo.save(task);
 
       // --- Попытка вызвать CronJob, если он есть ---
-      const jobName = `${task.type}-${task.referenceId}`;
-      if (this.schedulerRegistry.doesExist('cron', jobName)) {
-        const job = this.schedulerRegistry.getCronJob(jobName);
-        await job.fireOnTick();
-        this.schedulerRegistry.deleteCronJob(jobName);
-        this.logger.debug(`CronJob ${jobName} успешно выполнен и удален`);
-      } else {
-        this.logger.debug(
-          `CronJob ${jobName} не найден, задача выполнена напрямую`,
-        );
-      }
+      // const jobName = `${task.type}-${task.referenceId}`;
+      // if (this.schedulerRegistry.doesExist('cron', jobName)) {
+      //   const job = this.schedulerRegistry.getCronJob(jobName);
+      //   await job.fireOnTick();
+      //   this.schedulerRegistry.deleteCronJob(jobName);
+      //   this.logger.debug(`CronJob ${jobName} успешно выполнен и удален`);
+      // } else {
+      //   this.logger.debug(
+      //     `CronJob ${jobName} не найден, задача выполнена напрямую`,
+      //   );
+      // }
     } catch (err) {
       this.logger.error(
         `Ошибка при выполнении задачи ${task.type}-${task.referenceId}`,
@@ -424,9 +426,9 @@ export class CronService {
 
     contest.status = 'completed';
     await this.contestService.saveContest(contest);
-    console.log(1222222222222);
 
-    const winners = await this.contestService.getWinners(contest.id);
+    const winners = await this.contestService.getWinners(contest);
+    console.log(3333333, winners);
 
     if (winners.length) {
       await Promise.all(
@@ -438,7 +440,6 @@ export class CronService {
             this.logger.warn(`Группа с id ${winner.groupId} не найдена`);
             return;
           }
-          console.log(contest.telegramMessageIds);
 
           const messageIdsArray = Array.isArray(contest.telegramMessageIds)
             ? contest.telegramMessageIds
@@ -458,7 +459,6 @@ export class CronService {
           );
         }),
       );
-      console.log(1, contest);
 
       for (const msgId of contest.telegramMessageIds ?? []) {
         if (msgId) {

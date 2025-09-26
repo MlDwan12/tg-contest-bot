@@ -518,7 +518,7 @@ export class ContestServiceV2 {
         'Задача на завершение не найдена',
         HttpStatus.CONFLICT,
       );
-    await this._cronService.executeTask(task);
+    // await this._cronService.executeTask(task);
   }
 
   async cancelContest(contestId: number): Promise<void> {

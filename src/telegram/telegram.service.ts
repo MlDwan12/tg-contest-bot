@@ -501,8 +501,9 @@ export class TelegramService {
           newImageUrl,
           buttonText,
           clickCount: isAdminChange
-            ? contest.participations.length
-            : contest.participations.length + 1,
+            ? (contest.participations?.length ?? contest.participants?.length)
+            : (contest.participations?.length ?? contest.participants?.length) +
+              1,
         },
         {
           delay: 5000,

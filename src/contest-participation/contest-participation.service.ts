@@ -133,13 +133,13 @@ export class ContestParticipationService {
     //   `Обновление победителей для конкурса id=${contestId}, ids=${ids}`,
     // );
 
-    const contest = await this.contestService.getContestById(contestId);
-    const participants = await this.participationRepo.find({
+    const contest = await this.contestService.getContestByIdWin(contestId);
+    const participantsUpdate = await this.participationRepo.find({
       where: {
         id: In(ids),
         contest: { id: contestId },
       },
-      relations: { contest: true, user: true },
+      relations: { user: true, contest: true },
     });
 
     if (!contest) {
@@ -151,43 +151,39 @@ export class ContestParticipationService {
     //   `Найдено участников для обновления: ${participants.map((p) => p.id)}`,
     // );
 
-    const participantsUpdate = participants;
-
     if (contest.winnerStrategy === 'manual' && !contest.winners.length) {
       contest.winnerStrategy = 'random';
       await this.contestService.saveContest(contest);
       //this.logger.log(`Стратегия победителей установлена в random`);
     }
+    console.log(1231231231, participantsUpdate);
 
-    if (contest.winners.length) {
+    if (contest.winners?.length) {
       let i = 1;
       contest.winners.forEach((winner) => {
         const participant = participantsUpdate.find(
-          (p) => p.user.id === winner.user.id,
+          (p) => p.user?.id === winner.user.id, // теперь точно есть user
         );
         if (participant) {
           participant.status = 'winner';
           participant.prizePlace = i;
-          // //this.logger.log(
-          //   `Победитель обновлен: userId=${participant.user.id}, prizePlace=${i}`,
-          // );
         }
         i++;
       });
     } else {
-      for (let i = 0; i < participantsUpdate.length; i++) {
-        participantsUpdate[i].status = 'winner';
-        participantsUpdate[i].prizePlace = i + 1;
-        // //this.logger.log(
-        //   `Победитель назначен: userId=${participantsUpdate[i].user.id}, prizePlace=${i + 1}`,
-        // );
-      }
+      participantsUpdate.forEach((p, idx) => {
+        p.status = 'winner';
+        p.prizePlace = idx + 1;
+      });
     }
 
-    const updated = await this.participationRepo.save(participantsUpdate);
-    // //this.logger.log(
-    //   `Обновление победителей завершено, участников обновлено: ${updated.length}`,
-    // );
+    await this.participationRepo.save(participantsUpdate);
+
+    const updated = await this.participationRepo.find({
+      where: { id: In(ids), contest: { id: contestId } },
+      relations: { user: true },
+    });
+
     return updated;
   }
 
