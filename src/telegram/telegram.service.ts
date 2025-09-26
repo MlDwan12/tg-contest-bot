@@ -325,6 +325,8 @@ export class TelegramService {
       contest.status === 'active'
         ? `(${counter ?? contest.participants.length})`
         : '';
+    console.log(buttonText);
+
     const inlineKeyboard: InlineKeyboardMarkup =
       buttonText === 'none'
         ? { inline_keyboard: [] }
@@ -366,30 +368,15 @@ export class TelegramService {
         return result as TextMessage | PhotoMessage | true | undefined;
       }
 
-      if (newImageUrl) {
-        //this.logger.log(`Редактируем caption фото сообщения ${messageId}`);
+      if (counter !== undefined || newText || newName || buttonText) {
         const result = await this.bot.telegram.editMessageCaption(
           Number(channelId),
           messageId,
           undefined,
-          contentText,
+          contentText || ' ',
           { parse_mode: 'HTML', reply_markup: inlineKeyboard },
         );
 
-        //this.logger.log(`Текст сообщения ${messageId} обновлён`);
-        return result as TextMessage | PhotoMessage | true | undefined;
-      } else {
-        // Просто текстовое сообщение
-        //this.logger.log(`Редактируем текст сообщения ${messageId}`);
-        const result = await this.bot.telegram.editMessageText(
-          Number(channelId),
-          messageId,
-          undefined,
-          contentText,
-          { parse_mode: 'HTML', reply_markup: inlineKeyboard },
-        );
-
-        //this.logger.log(`Текст сообщения ${messageId} обновлён`);
         return result as TextMessage | PhotoMessage | true | undefined;
       }
     } catch (err) {
@@ -471,7 +458,7 @@ export class TelegramService {
   async editPostQueue(
     channelId: string,
     messageId: number,
-    contest: Contest,
+    contest: any,
     newName?: string,
     newText?: string,
     newImageUrl?: string,
@@ -502,6 +489,7 @@ export class TelegramService {
       await existingJob.updateData(updatedData);
     } else {
       console.log('=====> ОТРАБОТКА НОВОЙ ЗАДАЧИ');
+
       await this.postEditQueue.add(
         jobType,
         {
@@ -513,8 +501,8 @@ export class TelegramService {
           newImageUrl,
           buttonText,
           clickCount: isAdminChange
-            ? contest.participants.length
-            : contest.participants.length + 1,
+            ? contest.participations.length
+            : contest.participations.length + 1,
         },
         {
           delay: 5000,

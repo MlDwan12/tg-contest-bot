@@ -21,6 +21,7 @@ import { ContestParticipationService } from 'src/contest-participation/contest-p
 import { Telegraf } from 'telegraf';
 import { InjectBot } from 'nestjs-telegraf';
 import { ConfigService } from '@nestjs/config';
+import { Contest } from 'src/contest/entities/contest.entity';
 
 @Injectable()
 export class CronService {
@@ -85,7 +86,7 @@ export class CronService {
       }
 
       const runAt = new Date(task.runAt);
-      if (runAt <= now && task.type === ScheduledTaskType.POST_PUBLISH) {
+      if (runAt <= now && task.status === ScheduledTaskStatus.PENDING) {
         // просрочено — запускаем немедленно
         //this.logger.log(`Просроченная задача ${jobName}, запускаем немедленно`);
         await this.executeTask(task); // нужно, чтобы у тебя был метод выполнить задачу сразу
@@ -161,60 +162,105 @@ export class CronService {
             //this.logger.log(`Конкурс ${contest.id} активирован`);
           }
         } else if (task.type === ScheduledTaskType.CONTEST_FINISH) {
-          //this.logger.log(`Запуск завершения конкурса ${contest.id}`);
+          this.logger.log(`Запуск завершения конкурса ${contest.id}`);
+
           const channelsName = contest.allowedGroups
             .map((e) => `@${e.telegramName}`)
             .join('\n\n');
+          this.logger.debug(`Список каналов для конкурса: ${channelsName}`);
 
           contest.status = 'completed';
           await this.contestService.saveContest(contest);
+          this.logger.log(
+            `Статус конкурса ${contest.id} установлен на 'completed'`,
+          );
 
           const winners = await this.contestService.getWinners(contest.id);
+          this.logger.log(`Найдено ${winners.length} победителей`);
 
           if (winners.length) {
             await Promise.all(
               winners.map(async (winner) => {
+                this.logger.debug(
+                  `Обрабатываем победителя: userId=${winner.user.id}, groupId=${winner.groupId}`,
+                );
+
                 const group = channels.find(
                   (c) => c.telegramId === winner.groupId.toString(),
                 );
                 if (!group) {
-                  this.logger.warn(`Группа с id ${winner.groupId} не найдена`);
+                  this.logger.warn(
+                    `Группа с id ${winner.groupId} не найдена для победителя userId=${winner.user.id}`,
+                  );
                   return;
                 }
+                this.logger.debug(
+                  `Соответствующая группа найдена: ${group.telegramName} (${group.telegramId})`,
+                );
+                console.log(
+                  typeof contest.telegramMessageIds,
+                  contest.telegramMessageIds,
+                );
 
-                const messageIds = (contest.telegramMessageIds ?? [])
+                const telegramMessageIds = (() => {
+                  if (!contest.telegramMessageIds) return [];
+                  if (Array.isArray(contest.telegramMessageIds))
+                    return contest.telegramMessageIds;
+                  if (typeof contest.telegramMessageIds === 'string')
+                    return contest.telegramMessageIds
+                      .split(',')
+                      .map((id) => id.trim());
+                  return [];
+                })();
+
+                const messageIds = telegramMessageIds
                   .filter((msgId): msgId is string => msgId !== null)
                   .map((msgId) =>
                     this.getValueByGroupId(msgId, group.telegramId),
                   );
+                console.log(telegramMessageIds);
 
-                await this._telegramService.sendPrivateMessage(
-                  winner.user.telegramId,
-                  'Поздравляю, вы победили в конкурсе 🎉',
-                  group.telegramName,
-                  messageIds[0]!,
+                await Promise.all(
+                  telegramMessageIds.map(async (e) => {
+                    await this._telegramService.editPostQueue(
+                      e.split(':')[0],
+                      Number(e.split(':')[1]),
+                      contest,
+                      undefined,
+                      undefined,
+                      undefined,
+                      'Узнать результат',
+                      true,
+                    );
+                  }),
                 );
-                // console.log(
-                //   'winner.user.telegramId=======>',
-                //   winner.user.telegramId,
-                // );
+                this.logger.debug(
+                  `Сообщения для группы ${group.telegramName}: ${messageIds.join(', ')}`,
+                );
+
+                if (!messageIds.length) {
+                  this.logger.warn(
+                    `Нет сообщений для группы ${group.telegramName}, победитель userId=${winner.user.id}`,
+                  );
+                }
+
+                try {
+                  await this._telegramService.sendPrivateMessage(
+                    winner.user.telegramId,
+                    'Поздравляю, вы победили в конкурсе 🎉',
+                    group.telegramName,
+                    messageIds[0]!,
+                  );
+                  this.logger.log(
+                    `ЛС отправлено победителю userId=${winner.user.id}`,
+                  );
+                } catch (err) {
+                  this.logger.error(
+                    `Ошибка при отправке ЛС победителю userId=${winner.user.id}: ${err.message}`,
+                  );
+                }
               }),
             );
-
-            for (const msgId of contest.telegramMessageIds ?? []) {
-              if (msgId) {
-                await this._telegramService.editPostQueue(
-                  msgId.split(':')[0],
-                  Number(msgId.split(':')[1]),
-                  contest,
-                  undefined,
-                  undefined,
-                  undefined,
-                  'Узнать результат',
-                  true,
-                );
-              }
-            }
 
             for (const adminId of this.adminIds) {
               await this._telegramService.sendPrivateMessage(
@@ -261,6 +307,8 @@ export class CronService {
   }
 
   public getValueByGroupId(input: string, groupId: string): string | null {
+    console.log(input, groupId);
+
     const cleaned = input.replace(/^\[|\]$/g, '');
     const pairs = cleaned.split(',');
     for (const pair of pairs) {
@@ -293,11 +341,12 @@ export class CronService {
   }
 
   public async executeTask(task: ScheduledTask) {
-    // //this.logger.log(
-    //   `Немедленное выполнение задачи: ${task.type}-${task.referenceId}`,
-    // );
+    // if (!task) return;
+    console.log(123);
 
-    if (!task) return;
+    this.logger.debug(
+      `Начало выполнения задачи: ${task.type}-${task.referenceId}`,
+    );
     console.log('getContestById======> ', task.referenceId);
 
     const contest = await this.contestService.getContestById(task.referenceId);
@@ -307,10 +356,10 @@ export class CronService {
     }
 
     try {
+      // --- Публикация поста ---
       if (task.type === ScheduledTaskType.POST_PUBLISH) {
         console.log('contest.name=====>', contest.name);
 
-        //this.logger.log(`Немедленное выполнение задачи публикации`);
         const channels = contest.allowedGroups;
         const telegramMessageIds: string[] = [];
 
@@ -324,11 +373,9 @@ export class CronService {
               channel.telegramId,
               contest.buttonText,
             );
+
             const messageIdStr = `${telegramMessageId[0].chatId}:${telegramMessageId[0].messageId}`;
             telegramMessageIds.push(messageIdStr);
-            // //this.logger.log(
-            //   `Конкурс ${contest.id} отправлен в канал ${channel.telegramId}`,
-            // );
           }),
         );
 
@@ -336,30 +383,30 @@ export class CronService {
           contest.telegramMessageIds = telegramMessageIds;
           contest.status = 'active';
           await this.contestService.saveContest(contest);
-          //this.logger.log(`Конкурс ${contest.id} активирован`);
         }
       }
-      this.logger.debug(
-        `Тип задачи в БД: ${task.type}, ожидаем: ${ScheduledTaskType.CONTEST_FINISH}`,
-      );
 
+      // --- Завершение конкурса ---
       if (task.type === ScheduledTaskType.CONTEST_FINISH) {
-        contest.status = 'completed';
-        await this.contestService.saveContest(contest);
-        //this.logger.log(`Конкурс ${contest.id} завершен`);
+        await this.handleContestCompletion(contest);
       }
 
-      // обновляем статус задачи
+      // --- Обновляем статус задачи ---
       task.status = ScheduledTaskStatus.COMPLETED;
       await this.scheduledTaskRepo.save(task);
 
-      const job = this.schedulerRegistry.getCronJob(
-        `${task.type}-${task.referenceId}`,
-      );
-
-      await job.fireOnTick();
-      this.schedulerRegistry.deleteCronJob(`${task.type}-${task.referenceId}`);
-      //this.logger.log(`CronJob ${`${task.type}-${task.referenceId}`} удалена`);
+      // --- Попытка вызвать CronJob, если он есть ---
+      const jobName = `${task.type}-${task.referenceId}`;
+      if (this.schedulerRegistry.doesExist('cron', jobName)) {
+        const job = this.schedulerRegistry.getCronJob(jobName);
+        await job.fireOnTick();
+        this.schedulerRegistry.deleteCronJob(jobName);
+        this.logger.debug(`CronJob ${jobName} успешно выполнен и удален`);
+      } else {
+        this.logger.debug(
+          `CronJob ${jobName} не найден, задача выполнена напрямую`,
+        );
+      }
     } catch (err) {
       this.logger.error(
         `Ошибка при выполнении задачи ${task.type}-${task.referenceId}`,
@@ -367,6 +414,73 @@ export class CronService {
       );
       task.status = ScheduledTaskStatus.FAILED;
       await this.scheduledTaskRepo.save(task);
+    }
+  }
+
+  private async handleContestCompletion(contest: any) {
+    const channelsName = contest.allowedGroups
+      .map((e) => `${e.telegramName}`)
+      .join('\n\n');
+
+    contest.status = 'completed';
+    await this.contestService.saveContest(contest);
+    console.log(1222222222222);
+
+    const winners = await this.contestService.getWinners(contest.id);
+
+    if (winners.length) {
+      await Promise.all(
+        winners.map(async (winner) => {
+          const group = contest.allowedGroups.find(
+            (c) => c.telegramId === winner.groupId.toString(),
+          );
+          if (!group) {
+            this.logger.warn(`Группа с id ${winner.groupId} не найдена`);
+            return;
+          }
+          console.log(contest.telegramMessageIds);
+
+          const messageIdsArray = Array.isArray(contest.telegramMessageIds)
+            ? contest.telegramMessageIds
+            : typeof contest.telegramMessageIds === 'string'
+              ? contest.telegramMessageIds.split(',').map((id) => id.trim())
+              : [];
+
+          messageIdsArray
+            .filter((msgId): msgId is string => msgId !== null)
+            .map((msgId) => this.getValueByGroupId(msgId, group.telegramId));
+
+          await this._telegramService.sendPrivateMessage(
+            winner.user.telegramId,
+            'Поздравляю, вы победили в конкурсе 🎉',
+            group.telegramName,
+            messageIdsArray[0]!,
+          );
+        }),
+      );
+      console.log(1, contest);
+
+      for (const msgId of contest.telegramMessageIds ?? []) {
+        if (msgId) {
+          await this._telegramService.editPostQueue(
+            msgId.split(':')[0],
+            Number(msgId.split(':')[1]),
+            contest,
+            undefined,
+            undefined,
+            undefined,
+            'Узнать результат',
+            true,
+          );
+        }
+      }
+
+      for (const adminId of this.adminIds) {
+        await this._telegramService.sendPrivateMessage(
+          adminId,
+          `Завершен конкурс: ${contest.name}\n\nГруппы, которые участвовали в розыгрыше:\n\n${channelsName}`,
+        );
+      }
     }
   }
 }

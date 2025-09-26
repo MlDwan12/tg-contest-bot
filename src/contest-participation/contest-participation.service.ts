@@ -26,12 +26,13 @@ export class ContestParticipationService {
     private readonly telegramService: TelegramService,
     @Inject(forwardRef(() => ContestService))
     private contestService: ContestService,
-    @InjectQueue('telegram') private readonly telegramQueue: Queue,
+    @InjectQueue('subscription-check') private readonly telegramQueue: Queue,
+    @InjectQueue('post-edit') private readonly telegramEditQueue: Queue,
   ) {}
 
   async registerParticipation(
     user: User,
-    contest: Contest,
+    contest: any,
     status: 'verified' | 'winner' = 'verified',
     groupId: number,
   ): Promise<ContestParticipation[] | { data: [] }> {
@@ -40,10 +41,12 @@ export class ContestParticipationService {
     //   Number(user.telegramId),
     // );
 
-    this.telegramQueue.add('checkSubscription', {
+    await this.telegramQueue.add('subscription-check', {
       telegramId: user.telegramId,
       requiredGroups: contest.requiredGroups,
     });
+
+    const participant = contest.participations.length;
 
     // if (contest.status === 'completed') {
     //   const winners = await this.participationRepo.find({
@@ -57,7 +60,7 @@ export class ContestParticipationService {
     if (contest.status === 'completed') {
       const winners = await this.participationRepo.query(
         `
-      SELECT id, "userId", "contestId", status
+      SELECT id, "userId", "contestId", status, "prizePlace"
       FROM contest_participations
       WHERE "contestId" = $1 AND status = 'winner'
     `,
@@ -65,27 +68,46 @@ export class ContestParticipationService {
       );
       return winners;
     }
+    console.log(participant);
 
-    const [participation] = await this.participationRepo.query(
+    await this.participationRepo.query(
       `
     INSERT INTO contest_participations("userId", "contestId", "status", "groupId")
     VALUES ($1, $2, $3, $4)
     ON CONFLICT("userId", "contestId") DO UPDATE
     SET "status" = EXCLUDED."status", "groupId" = EXCLUDED."groupId"
-    RETURNING id, "userId", "contestId", status, "groupId"
   `,
       [user.id, contest.id, status, groupId],
     );
 
-    if (contest.telegramMessageIds?.length) {
-      contest.telegramMessageIds.forEach((e) => {
-        const [channel, message] = e.split(':');
-        this.telegramQueue.add('editPost', {
-          channel,
-          messageId: Number(message),
-          contestId: contest.id,
-        });
-      });
+    const countResult = await this.participationRepo.query(
+      `
+    SELECT COUNT(*) AS participant_count
+    FROM contest_participations
+    WHERE "contestId" = $1
+  `,
+      [contest.id],
+    );
+
+    const participantCount = Number(countResult[0].participant_count);
+
+    if (contest.telegramMessageIds && participantCount > participant) {
+      void Promise.all(
+        contest.telegramMessageIds.split(',').map((e) => {
+          const [channel, message] = e.split(':');
+
+          return this.telegramEditQueue.add('edit-counter', {
+            channelId: channel,
+            messageId: Number(message),
+            contest,
+            buttonText: contest?.buttonText,
+            newName: undefined,
+            newText: undefined,
+            newImageUrl: undefined,
+            clickCount: participantCount,
+          });
+        }),
+      );
     }
 
     return [];

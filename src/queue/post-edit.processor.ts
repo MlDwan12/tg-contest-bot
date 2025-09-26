@@ -3,7 +3,6 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { TelegramService } from '../telegram/telegram.service';
 
-// PostEditProcessor
 @Injectable()
 @Processor('post-edit')
 export class PostEditProcessor extends WorkerHost {
@@ -28,9 +27,12 @@ export class PostEditProcessor extends WorkerHost {
         newText,
         newImageUrl,
       } = job.data;
+      console.log(job.name);
+      console.log(job.data);
 
       if (job.name === 'edit-counter') {
         // Только обновляем кнопку/счётчик
+
         return await this.telegramService.editPost(
           channelId,
           messageId,
@@ -45,6 +47,8 @@ export class PostEditProcessor extends WorkerHost {
 
       if (job.name === 'edit-admin') {
         // Полное редактирование админом
+        console.log(buttonText);
+
         return await this.telegramService.editPost(
           channelId,
           messageId,
@@ -66,7 +70,7 @@ export class PostEditProcessor extends WorkerHost {
 }
 
 @Injectable()
-@Processor('subscription-check') // новая очередь
+@Processor('subscription-check')
 export class SubscriptionCheckProcessor extends WorkerHost {
   private readonly logger = new Logger(SubscriptionCheckProcessor.name);
 
@@ -75,7 +79,11 @@ export class SubscriptionCheckProcessor extends WorkerHost {
   }
 
   async process(job: Job<any, any, string>): Promise<any> {
+    console.log(job.name);
+
+    if (job.name !== 'subscription-check') return;
     const { telegramId, requiredGroups } = job.data;
+
     this.logger.debug(`Проверка подписки для telegramId=${telegramId}`);
 
     try {

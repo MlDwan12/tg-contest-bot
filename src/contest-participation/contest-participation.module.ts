@@ -15,7 +15,10 @@ import { BullModule } from '@nestjs/bullmq';
     forwardRef(() => ContestModule),
     forwardRef(() => UsersModule),
     BullModule.registerQueue({
-      name: 'telegram',
+      name: 'subscription-check',
+    }),
+    BullModule.registerQueue({
+      name: 'post-edit',
     }),
   ],
   controllers: [ContestParticipationController],

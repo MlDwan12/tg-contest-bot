@@ -15,6 +15,7 @@ import { AuthModule } from './auth/auth.module';
 import { CronModule } from './cron/cron.module';
 import { BullModule } from '@nestjs/bullmq';
 import { QueueModule } from './queue/queue.module';
+import { QueueCleaner } from './queue/queue-cleaner.service';
 
 @Module({
   imports: [
@@ -53,6 +54,9 @@ import { QueueModule } from './queue/queue.module';
     BullModule.registerQueue({
       name: 'post-edit',
     }),
+    BullModule.registerQueue({
+      name: 'subscription-check',
+    }),
     UsersModule,
     ContestModule,
     ContestParticipationModule,
@@ -65,6 +69,6 @@ import { QueueModule } from './queue/queue.module';
     QueueModule,
   ],
   controllers: [],
-  providers: [],
+  providers: [QueueCleaner],
 })
 export class AppModule {}

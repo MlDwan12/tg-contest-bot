@@ -157,7 +157,7 @@ export class ContestService {
   }
 
   async getContestById(id: number): Promise<any> {
-    const contest = await this.contestRepo.query(
+    const contest: Contest = await this.contestRepo.query(
       `SELECT * FROM contests WHERE id = $1`,
       [id],
     );
