@@ -51,12 +51,29 @@ export class ContestParticipationService {
       this.logger.warn(
         `Попытка регистрации в завершённый конкурс id=${contest.id}`,
       );
+      // const winners = await this.participationRepo.query(
+      //   `
+      //   SELECT id, "contestId", status, "prizePlace"
+      //   FROM contest_participations
+      //   WHERE "contestId" = $1 AND status = 'winner'
+      // `,
+      //   [contest.id],
+      // );
+
       const winners = await this.participationRepo.query(
         `
-        SELECT id, "userId", "contestId", status, "prizePlace"
-        FROM contest_participations
-        WHERE "contestId" = $1 AND status = 'winner'
-      `,
+          SELECT 
+            cp.id,
+            cp."contestId",
+            cp.status,
+            cp."prizePlace",
+            u.id AS "userId",
+            u.username,
+            u."telegramId"
+          FROM contest_participations cp
+          JOIN users u ON u.id = cp."userId"
+          WHERE cp."contestId" = $1 AND cp.status = 'winner'
+        `,
         [contest.id],
       );
       return winners;

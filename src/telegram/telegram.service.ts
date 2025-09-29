@@ -369,13 +369,31 @@ export class TelegramService {
       }
 
       if (counter !== undefined || newText || newName || buttonText) {
-        const result = await this.bot.telegram.editMessageCaption(
-          Number(channelId),
-          messageId,
-          undefined,
-          contentText || ' ',
-          { parse_mode: 'HTML', reply_markup: inlineKeyboard },
-        );
+        // const result = await this.bot.telegram.editMessageCaption(
+        //   Number(channelId),
+        //   messageId,
+        //   undefined,
+        //   contentText || ' ',
+        //   { parse_mode: 'HTML', reply_markup: inlineKeyboard },
+        // );
+        let result;
+        if (contest.imageUrl) {
+          result = await this.bot.telegram.editMessageCaption(
+            Number(channelId),
+            messageId,
+            undefined,
+            contentText || ' ',
+            { parse_mode: 'HTML', reply_markup: inlineKeyboard },
+          );
+        } else {
+          result = await this.bot.telegram.editMessageText(
+            Number(channelId),
+            messageId,
+            undefined,
+            contentText || ' ',
+            { parse_mode: 'HTML', reply_markup: inlineKeyboard },
+          );
+        }
 
         return result as TextMessage | PhotoMessage | true | undefined;
       }

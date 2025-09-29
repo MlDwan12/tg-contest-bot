@@ -80,13 +80,13 @@ export class UsersService {
     // спорный момент пропуск в 2 раза ниже но потребление памяти в 2 раза ниже
     const [user] = await this.userRepo.query(
       `
-        INSERT INTO users("telegramId", "username")
-        VALUES ($1, $2)
-        ON CONFLICT("telegramId") DO UPDATE
-        SET "username" = EXCLUDED."username"
-        RETURNING id, "telegramId", "username"
-      `,
-      [telegramId, username],
+    INSERT INTO users("telegramId", "username")
+    VALUES ($1, $2)
+    ON CONFLICT("telegramId") DO UPDATE
+    SET "username" = COALESCE(EXCLUDED."username", users."username")
+    RETURNING id, "telegramId", "username"
+  `,
+      [telegramId, username ?? null],
     );
 
     return user;

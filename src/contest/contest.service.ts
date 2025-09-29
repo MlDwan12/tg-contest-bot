@@ -167,8 +167,8 @@ export class ContestService {
       relations: {
         allowedGroups: true,
         requiredGroups: true,
-        winners: { user: true, contest: true },
-        participants: { user: true, contest: true },
+        winners: { user: { participations: { contest: true } }, contest: true },
+        participants: { user: { participations: { contest: true } }, contest: true },
       },
     });
   }
@@ -224,12 +224,22 @@ WHERE cp."contestId" = $1;`,
         ),
       ]);
     this.logger.debug(`Получен конкурс с id=${id} для клиента`);
-
+    const { telegramMessageIds, ...otherInfo } = contest[0];
     return {
-      ...contest[0],
+      ...otherInfo,
+      telegramMessageIds: telegramMessageIds ?? '',
       allowedGroups,
       requiredGroups,
-      winners,
+      winners: winners.map((e) => {
+        return {
+          id: e.id,
+          user: {
+            id: e.userId,
+            telegramId: e.telegramId,
+            username: e.username,
+          },
+        };
+      }),
       participations,
     };
   }
@@ -491,6 +501,7 @@ WHERE cp."contestId" = $1;`,
 
     if (contest.winners?.length) {
       this.logger.debug(`Получение победителей, тип конкурса 1`);
+      console.log(123131231231231231, contest.winners);
 
       winners = contest.winners
         .flatMap((e) => {
