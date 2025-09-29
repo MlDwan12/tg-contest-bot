@@ -168,7 +168,10 @@ export class ContestService {
         allowedGroups: true,
         requiredGroups: true,
         winners: { user: { participations: { contest: true } }, contest: true },
-        participants: { user: { participations: { contest: true } }, contest: true },
+        participants: {
+          user: { participations: { contest: true } },
+          contest: true,
+        },
       },
     });
   }
@@ -512,10 +515,7 @@ WHERE cp."contestId" = $1;`,
         .map((p) => p.id);
     }
 
-    if (
-      contest?.participants ??
-      (contest?.participations && !contest.winners.length)
-    ) {
+    if (contest?.participations && !contest.winners.length) {
       this.logger.debug(`Получение победителей, тип конкурса 2`);
       const randomElements = await this.getRandomElement(
         contest?.participants && contest.participants.length > 0
