@@ -81,18 +81,16 @@ export class CronService {
       }
 
       if (exists) {
-        //this.logger.log(`Задача ${jobName} уже запланирована, пропускаем`);
         continue;
       }
 
       const runAt = new Date(task.runAt);
       if (runAt <= now && task.status === ScheduledTaskStatus.PENDING) {
-        // просрочено — запускаем немедленно
-        //this.logger.log(`Просроченная задача ${jobName}, запускаем немедленно`);
-        // await this.executeTask(task); // нужно, чтобы у тебя был метод выполнить задачу сразу
+        const contest = await this.contestService.getContestByIdWin(
+          task.referenceId,
+        );
+        await this.executeTask(task, contest);
       } else {
-        // запланировано на будущее
-        //this.logger.log(`Запланирована задача ${jobName} на ${runAt}`);
         this.scheduleTask(task);
       }
     }
@@ -100,14 +98,8 @@ export class CronService {
 
   scheduleTask(task: any) {
     const cronExpression = this.convertDateToCron(new Date(task.runAt));
-    // //this.logger.log(
-    //   `Создание CronJob для задачи ${task.type}-${task.referenceId}`,
-    // );
 
     const job = new CronJob(cronExpression, async () => {
-      // //this.logger.log(
-      //   `Выполнение задачи: ${task.type} для referenceId: ${task.referenceId}`,
-      // );
       const contest: any = await this.contestService.getContestByIdWin(
         task.referenceId,
       );
@@ -148,9 +140,6 @@ export class CronService {
               const messageIdStr = `${telegramMessageId[0].chatId}:${telegramMessageId[0].messageId}`;
 
               telegramMessageIds.push(messageIdStr);
-              // //this.logger.log(
-              //   `Конкурс ${contest.id} отправлен в канал ${channel.telegramId}`,
-              // );
             }),
           );
 
@@ -159,7 +148,6 @@ export class CronService {
             contest.status = 'active';
             await this.contestService.saveContest(contest);
             telegramMessageIds.length = 0;
-            //this.logger.log(`Конкурс ${contest.id} активирован`);
           }
         } else if (task.type === ScheduledTaskType.CONTEST_FINISH) {
           this.logger.log(`Запуск завершения конкурса ${contest.id}`);
@@ -268,7 +256,6 @@ export class CronService {
                 `Завершен конкурс: ${contest.name}\n\nГруппы, которые участвовали в розыгрыше:\n\n${channelsName}`,
               );
             }
-            //this.logger.log(`Конкурс ${contest.id} завершен`);
           } else {
             for (const adminId of this.adminIds) {
               await this._telegramService.sendPrivateMessage(
@@ -297,9 +284,6 @@ export class CronService {
 
     this.schedulerRegistry.addCronJob(`${task.type}-${task.referenceId}`, job);
     job.start();
-    // //this.logger.log(
-    //   `CronJob ${task.type}-${task.referenceId} успешно добавлен и запущен`,
-    // );
   }
 
   private convertDateToCron(date: Date): string {
@@ -319,14 +303,12 @@ export class CronService {
   }
 
   async findTaskByRef(type: ScheduledTaskType, referenceId: number) {
-    //this.logger.log(`Поиск задачи: ${type}-${referenceId}`);
     return this.scheduledTaskRepo.findOne({
       where: { type, referenceId, status: ScheduledTaskStatus.PENDING },
     });
   }
 
   async deleteTaskFromDb(id: number | string) {
-    //this.logger.log(`Удаление задачи из БД, id=${id}`);
     return this.scheduledTaskRepo.delete(id);
   }
 
@@ -334,7 +316,6 @@ export class CronService {
     const jobName = `${task.type}-${task.referenceId}`;
     try {
       this.schedulerRegistry.deleteCronJob(jobName);
-      //this.logger.log(`Удалён CronJob ${jobName}`);
     } catch {
       this.logger.warn(`CronJob ${jobName} не найден для удаления`);
     }
@@ -342,18 +323,11 @@ export class CronService {
 
   public async executeTask(task: ScheduledTask, contest: any) {
     // if (!task) return;
-    console.log(123);
 
     this.logger.debug(
       `Начало выполнения задачи: ${task?.type}-${task?.referenceId}`,
     );
     console.log('getContestById======> ', task.referenceId);
-
-    // const contest = await this.contestService.getContestById(task.referenceId);
-    // if (!contest) {
-    //   this.logger.error(`Конкурс ${task.referenceId} не найден`);
-    //   return;
-    // }
 
     try {
       // --- Публикация поста ---
@@ -396,19 +370,6 @@ export class CronService {
       // --- Обновляем статус задачи ---
       task.status = ScheduledTaskStatus.COMPLETED;
       await this.scheduledTaskRepo.save(task);
-
-      // --- Попытка вызвать CronJob, если он есть ---
-      // const jobName = `${task.type}-${task.referenceId}`;
-      // if (this.schedulerRegistry.doesExist('cron', jobName)) {
-      //   const job = this.schedulerRegistry.getCronJob(jobName);
-      //   await job.fireOnTick();
-      //   this.schedulerRegistry.deleteCronJob(jobName);
-      //   this.logger.debug(`CronJob ${jobName} успешно выполнен и удален`);
-      // } else {
-      //   this.logger.debug(
-      //     `CronJob ${jobName} не найден, задача выполнена напрямую`,
-      //   );
-      // }
     } catch (err) {
       this.logger.error(
         `Ошибка при выполнении задачи ${task.type}-${task.referenceId}`,
