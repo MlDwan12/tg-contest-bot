@@ -513,8 +513,12 @@ export class ContestService {
           })
           .map((p) => p.id);
       }
+      console.log(1, contest);
 
-      if (contest?.participations && !contest.winners.length) {
+      if (
+        (contest?.participations?.length ?? contest?.participants?.length) &&
+        !contest.winners.length
+      ) {
         this.logger.debug(`Получение победителей, тип конкурса 2`);
         const randomElements = await this.getRandomElement(
           contest?.participants && contest.participants.length > 0
@@ -737,6 +741,28 @@ export class ContestService {
             }),
           );
 
+          for (const msgId of contest.telegramMessageIds ?? []) {
+            if (msgId) {
+              await this._telegramPostService.editPostQueue(
+                msgId.split(':')[0],
+                Number(msgId.split(':')[1]),
+                contest,
+                undefined,
+                undefined,
+                undefined,
+                'Узнать результат',
+                true,
+              );
+            }
+          }
+
+          for (const adminId of this.adminIds) {
+            await this._telegramPostService.sendPrivateMessage(
+              adminId,
+              `Завершен конкурс: ${contest.name}\n\nГруппы, которые участвовали в розыгрыше:\n\n${channelsName}`,
+            );
+          }
+        } else {
           for (const msgId of contest.telegramMessageIds ?? []) {
             if (msgId) {
               await this._telegramPostService.editPostQueue(

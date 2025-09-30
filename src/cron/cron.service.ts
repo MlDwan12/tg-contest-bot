@@ -379,7 +379,7 @@ export class CronService {
   private async handleContestCompletion(contest: any) {
     try {
       const channelsName = contest.allowedGroups
-        .map((e) => `${e.telegramName}`)
+        .map((e) => `@${e.telegramName}`)
         .join('\n\n');
 
       contest.status = 'completed';
