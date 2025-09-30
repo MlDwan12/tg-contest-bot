@@ -144,66 +144,71 @@ export class ContestParticipationService {
   }
 
   async updateWinner(ids: number[], contestId: number) {
-    this.logger.log(
-      `Обновление победителей: contestId=${contestId}, ids=[${ids.join(', ')}]`,
-    );
-
-    const contest = await this.contestService.getContestByIdWin(contestId);
-    if (!contest) {
-      this.logger.error(`Конкурс не найден: id=${contestId}`);
-      throw new HttpException('Конкурс не найден', HttpStatus.NOT_FOUND);
-    }
-
-    const participantsUpdate = await this.participationRepo.find({
-      where: { id: In(ids), contest: { id: contestId } },
-      relations: { user: true, contest: true },
-    });
-
-    if (contest.winnerStrategy === 'manual' && !contest.winners.length) {
-      contest.winnerStrategy = 'random';
-      await this.contestService.saveContest(contest);
-      this.logger.warn(
-        `У конкурса id=${contestId} не было победителей, стратегия изменена на random`,
+    try {
+      this.logger.log(
+        `Обновление победителей: contestId=${contestId}, ids=[${ids.join(', ')}]`,
       );
-    }
 
-    if (contest.winners?.length) {
-      let i = 1;
-      contest.winners.forEach((winner) => {
-        const participant = participantsUpdate.find(
-          (p) => p.user?.id === winner.user.id,
+      const contest = await this.contestService.getContestByIdWin(contestId);
+      if (!contest) {
+        this.logger.error(`Конкурс не найден: id=${contestId}`);
+        throw new HttpException('Конкурс не найден', HttpStatus.NOT_FOUND);
+      }
+
+      const participantsUpdate = await this.participationRepo.find({
+        where: { id: In(ids), contest: { id: contestId } },
+        relations: { user: true, contest: true },
+      });
+
+      if (contest.winnerStrategy === 'manual' && !contest.winners.length) {
+        contest.winnerStrategy = 'random';
+        await this.contestService.saveContest(contest);
+        this.logger.warn(
+          `У конкурса id=${contestId} не было победителей, стратегия изменена на random`,
         );
-        if (participant) {
-          participant.status = 'winner';
-          participant.prizePlace = i;
-          this.logger.log(
-            `Назначен победитель вручную: userId=${participant.user.id}, place=${i}`,
+      }
+
+      if (contest.winners?.length) {
+        let i = 1;
+        contest.winners.forEach((winner) => {
+          const participant = participantsUpdate.find(
+            (p) => p.user?.id === winner.user.id,
           );
-        }
-        i++;
+          if (participant) {
+            participant.status = 'winner';
+            participant.prizePlace = i;
+            this.logger.log(
+              `Назначен победитель вручную: userId=${participant.user.id}, place=${i}`,
+            );
+          }
+          i++;
+        });
+      } else {
+        participantsUpdate.forEach((p, idx) => {
+          p.status = 'winner';
+          p.prizePlace = idx + 1;
+          this.logger.log(
+            `Назначен победитель автоматически: userId=${p.user.id}, place=${idx + 1}`,
+          );
+        });
+      }
+
+      await this.participationRepo.save(participantsUpdate);
+
+      const updated = await this.participationRepo.find({
+        where: { id: In(ids), contest: { id: contestId } },
+        relations: { user: true },
       });
-    } else {
-      participantsUpdate.forEach((p, idx) => {
-        p.status = 'winner';
-        p.prizePlace = idx + 1;
-        this.logger.log(
-          `Назначен победитель автоматически: userId=${p.user.id}, place=${idx + 1}`,
-        );
-      });
+
+      this.logger.log(
+        `Победители обновлены: contestId=${contestId}, count=${updated.length}`,
+      );
+
+      return updated;
+    } catch (error) {
+      this.logger.error('Ошибка при обновлении победителей', error);
+      throw error;
     }
-
-    await this.participationRepo.save(participantsUpdate);
-
-    const updated = await this.participationRepo.find({
-      where: { id: In(ids), contest: { id: contestId } },
-      relations: { user: true },
-    });
-
-    this.logger.log(
-      `Победители обновлены: contestId=${contestId}, count=${updated.length}`,
-    );
-
-    return updated;
   }
 
   async getAllByGroupId(groupId: string) {
