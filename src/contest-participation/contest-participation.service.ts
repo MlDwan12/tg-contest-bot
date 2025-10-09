@@ -69,6 +69,7 @@ export class ContestParticipationService {
     }
 
     const requiredGroups = contest.requiredGroups?.map((g) => g.name) || [];
+
     if (requiredGroups.length > 0) {
       await this.telegramService.isUserSubscribed(
         contest.requiredGroups,
@@ -113,7 +114,11 @@ export class ContestParticipationService {
     this.logger.log(`Текущий счётчик участников (Redis): ${currentCount}`);
 
     // 🟣 Обновляем посты в Telegram
-    if (contest.telegramMessageIds && currentCount > 0) {
+    if (
+      contest.telegramMessageIds &&
+      currentCount > 0 &&
+      insertResult.length > 0
+    ) {
       const messagePairs = contest.telegramMessageIds.split(',');
 
       for (const pair of messagePairs) {
