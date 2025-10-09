@@ -143,7 +143,7 @@ export class TelegramService {
     needCheck: boolean = true,
   ) {
     const results: { chat: string; subscribed: boolean }[] = [];
-    console.log(chats);
+    console.log('------', chats);
 
     for (const chat of chats) {
       try {
@@ -166,7 +166,7 @@ export class TelegramService {
 
     const unsub = results.filter((r) => !r.subscribed).map((r) => r.chat);
     if (unsub.length && needCheck) {
-      const msg = `Вы не подписаны на ${unsub.join(', ')}`;
+      const msg = `Вы не подписаны на ${unsub}`;
       this.logger.warn(msg);
       throw new HttpException(msg, HttpStatus.CONFLICT);
     }
