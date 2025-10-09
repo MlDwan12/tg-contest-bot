@@ -57,9 +57,6 @@ export class CronService {
       status: ScheduledTaskStatus.PENDING,
       payload: task.payload,
     });
-    // //this.logger.log(
-    //   `Создана новая задача в БД: ${task.type}-${task.referenceId}`,
-    // );
     return this.scheduledTaskRepo.save(scheduledTask);
   }
 
@@ -69,7 +66,6 @@ export class CronService {
     const tasks = await this.scheduledTaskRepo.find({
       where: { status: ScheduledTaskStatus.PENDING },
     });
-    //this.logger.log(`Сканирование задач: найдено ${tasks.length} задач`);
 
     for (const task of tasks) {
       const jobName = `${task.type}-${task.referenceId}`;
@@ -206,7 +202,6 @@ export class CronService {
                   .map((msgId) =>
                     this.getValueByGroupId(msgId, group.telegramId),
                   );
-                console.log(telegramMessageIds);
 
                 await Promise.all(
                   telegramMessageIds.map(async (e) => {
@@ -291,8 +286,6 @@ export class CronService {
   }
 
   public getValueByGroupId(input: string, groupId: string): string | null {
-    console.log(input, groupId);
-
     const cleaned = input.replace(/^\[|\]$/g, '');
     const pairs = cleaned.split(',');
     for (const pair of pairs) {

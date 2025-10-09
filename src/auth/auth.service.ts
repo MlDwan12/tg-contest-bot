@@ -26,7 +26,6 @@ export class AuthService {
     const isValid = await bcrypt.compare(password, user.password);
 
     if (isValid) {
-      //this.logger.log(`Успешная аутентификация: ${userName} (id=${user.id})`);
       return user;
     } else {
       this.logger.warn(`Неверный пароль для пользователя ${userName}`);
@@ -50,7 +49,6 @@ export class AuthService {
       expiresIn: '7d',
     });
 
-    //this.logger.log(`Токены сгенерированы для userId=${user.id}`);
 
     return { accessToken, refreshToken };
   }
@@ -71,7 +69,6 @@ export class AuthService {
         throw new UnauthorizedException();
       }
 
-      //this.logger.log(`Успешное обновление токенов для userId=${user.id}`);
       return this.generateTokens(user);
     } catch (e) {
       this.logger.error(`Ошибка при обновлении токенов: ${e.message}`);

@@ -58,12 +58,7 @@ export class TelegramService {
       ? [...new Set(chatIds)]
       : [...new Set(chatIds.split(',').map((id) => id.trim()))];
 
-    // //this.logger.log(
-    //   `Отправка постов в чаты: ${chatIdsArray.join(', ')}, contestId=${contestId}, groupId=${groupId}`,
-    // );
-
     const webAppUrl = `${process.env.MINI_APP_URL}?startapp=${groupId}_${contestId}`;
-    // const webAppUrl = `https://t.me/my_test_contest_bot/apprandom?startapp=${groupId}_${contestId}`;
 
     const promises = chatIdsArray.map(async (chatId) => {
       try {
@@ -96,9 +91,6 @@ export class TelegramService {
           });
         }
 
-        // //this.logger.log(
-        //   `Сообщение успешно отправлено в чат ${chatId}, messageId=${sentMessage.message_id}`,
-        // );
         return { chatId, messageId: sentMessage.message_id };
       } catch (err) {
         this.logger.error(
@@ -117,7 +109,6 @@ export class TelegramService {
 
   async deleteMessage(chatId: string, messageId: number) {
     try {
-      //this.logger.log(`Удаление сообщения ${messageId} из чата ${chatId}`);
       await this.bot.telegram.deleteMessage(chatId, messageId);
     } catch (err) {
       this.logger.error(
@@ -133,7 +124,6 @@ export class TelegramService {
 
   async getChatInfo(usernameOrId: string) {
     try {
-      //this.logger.log(`Получение информации о чате ${usernameOrId}`);
       return await this.bot.telegram.getChat(usernameOrId);
     } catch (err) {
       this.logger.error(
@@ -152,9 +142,6 @@ export class TelegramService {
     telegramId: number,
     needCheck: boolean = true,
   ) {
-    // //this.logger.log(
-    //   `Проверка подписки пользователя ${telegramId} в ${chats.length} чатах`,
-    // );
     const results: { chat: string; subscribed: boolean }[] = [];
     console.log(chats);
 
@@ -191,10 +178,6 @@ export class TelegramService {
     users: number[],
     chats: Channel[],
   ): Promise<SubscriptionResult[]> {
-    // //this.logger.log(
-    //   `Проверка подписки ${users.length} пользователей в ${chats.length} чатах`,
-    // );
-
     return Promise.all(
       users.map(async (telegramId) => {
         const results = await Promise.allSettled(
@@ -219,7 +202,6 @@ export class TelegramService {
           }),
         );
 
-        // Форматируем результаты
         const details: SubscriptionDetail[] = results.map((r) =>
           r.status === 'fulfilled'
             ? r.value
@@ -251,8 +233,6 @@ export class TelegramService {
     buttonText?: string,
   ): Promise<Message.TextMessage | Message.PhotoMessage> {
     try {
-      //this.logger.log(`Отправка ЛС пользователю ${telegramId}`);
-
       if (photoUrl) {
         // Отправляем фото с подписью
         console.log(photoUrl);
@@ -343,12 +323,7 @@ export class TelegramService {
     const contentText = `${newName ?? contest.name}\n\n${newText ?? contest.description}`;
 
     try {
-      // //this.logger.log(
-      //   `Редактирование поста ${messageId} в канале ${channelId}`,
-      // );
-
       if (newImageUrl) {
-        //this.logger.log(`Редактируем фото сообщения ${messageId}`);
         const media: InputMediaPhoto = {
           type: 'photo',
           media: { source: createReadStream(`.${newImageUrl}`) }, // URL или file_id
@@ -364,18 +339,10 @@ export class TelegramService {
           { reply_markup: inlineKeyboard },
         );
 
-        //this.logger.log(`Фото сообщения ${messageId} обновлено`);
         return result as TextMessage | PhotoMessage | true | undefined;
       }
 
       if (counter !== undefined || newText || newName || buttonText) {
-        // const result = await this.bot.telegram.editMessageCaption(
-        //   Number(channelId),
-        //   messageId,
-        //   undefined,
-        //   contentText || ' ',
-        //   { parse_mode: 'HTML', reply_markup: inlineKeyboard },
-        // );
         let result;
         if (contest.imageUrl) {
           result = await this.bot.telegram.editMessageCaption(
@@ -420,12 +387,6 @@ export class TelegramService {
 
       const isAdmin = ['administrator', 'creator'].includes(member.status);
 
-      // //this.logger.log(
-      //   `Бот ${botInfo.username} является ${
-      //     isAdmin ? '' : 'не '
-      //   }админом в чате ${channel.telegramName}`,
-      // );
-
       return isAdmin;
     } catch (err) {
       this.logger.error(
@@ -447,30 +408,6 @@ export class TelegramService {
       throw new Error(`Telegram bot not available: ${err.message}`);
     }
   }
-
-  // async editPostQueue(
-  //   channelId: string,
-  //   messageId: number,
-  //   contest: Contest,
-  //   newName?: string,
-  //   newText?: string,
-  //   newImageUrl?: string,
-  //   buttonText?: string,
-  // ) {
-  //   await this.postEditQueue.add(
-  //     'edit',
-  //     {
-  //       channelId,
-  //       messageId,
-  //       contest,
-  //       newName,
-  //       newText,
-  //       newImageUrl,
-  //       buttonText,
-  //     },
-  //     { delay: 2000 },
-  //   );
-  // }
 
   // TelegramService
   async editPostQueue(

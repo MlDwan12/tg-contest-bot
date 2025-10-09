@@ -140,9 +140,6 @@ export class ContestServiceV2 {
       );
       savedContest.telegramMessageIds = telegramMessageIds;
       await this.contestRepo.save(savedContest);
-      // this.logger.log(
-      //   `Сообщения опубликованы: ${telegramMessageIds.join(',')}`,
-      // );
     }
 
     await this._cronService.createTaskInDb({
@@ -151,9 +148,6 @@ export class ContestServiceV2 {
       runAt: new Date(dto.endDate),
       payload: { buttonText: dto.buttonText },
     });
-    // this.logger.log(
-    //   `Создана cron-задача завершения конкурса id=${savedContest.id}`,
-    // );
 
     if (dto.startDate) {
       await this._cronService.createTaskInDb({
@@ -162,26 +156,18 @@ export class ContestServiceV2 {
         runAt: new Date(dto.startDate),
         payload: { buttonText: dto.buttonText },
       });
-      // this.logger.log(
-      //   `Создана cron-задача публикации конкурса id=${savedContest.id}`,
-      // );
+
       this._cronService.scheduleTask({
         type: ScheduledTaskType.POST_PUBLISH,
         referenceId: savedContest.id,
         runAt: savedContest.startDate,
       });
-      // this.logger.log(
-      //   `Запланирована публикация конкурса id=${savedContest.id} локально`,
-      // );
     } else {
       this._cronService.scheduleTask({
         type: ScheduledTaskType.CONTEST_FINISH,
         referenceId: savedContest.id,
         runAt: savedContest.endDate,
       });
-      // this.logger.log(
-      //   `Запланировано завершение конкурса id=${savedContest.id} локально`,
-      // );
     }
 
     return savedContest;
@@ -200,10 +186,6 @@ export class ContestServiceV2 {
     }
 
     Object.assign(contest, dto);
-
-    // this.logger.debug(
-    //   `Поля для обновления: ${JSON.stringify(dto)} | Конкурс id=${id}`,
-    // );
 
     if (dto.description || dto.buttonText || dto.name || dto.imageUrl) {
       await Promise.all(
@@ -246,10 +228,6 @@ export class ContestServiceV2 {
     this.logger.log(`Конкурс id=${id} успешно обновлён`);
 
     if (dto.endDate) {
-      // this.logger.debug(
-      //   `Изменение даты завершения для конкурса: {id:${contest.id} name: ${contest.name}`,
-      // );
-
       this.logger.debug(`Поиск крона для завершения конкурса`);
       const task = await this._cronService.findTaskByRef(
         ScheduledTaskType.CONTEST_FINISH,
@@ -257,9 +235,6 @@ export class ContestServiceV2 {
       );
 
       if (task) {
-        // this.logger.debug(
-        //   `Найдена задача для конкурса: ${JSON.stringify(task)}`,
-        // );
         this.logger.debug(`Удаление задачи с ${task.id} из бд`);
         await this._cronService.deleteTaskFromDb(task.id);
         this.logger.debug(`Задача удалена из бд`);
@@ -286,9 +261,6 @@ export class ContestServiceV2 {
   }
 
   async myContest(id: string, chatId: string) {
-    // this.logger.log(
-    //   `Запрос конкурсов пользователя telegramId=${id} в чате ${chatId}`,
-    // );
     return this.contestRepo.find({
       relations: {
         participants: { user: true },
@@ -333,9 +305,6 @@ export class ContestServiceV2 {
         contest.prizePlaces,
       );
       winners = randomElements.map((e) => e.id);
-      // this.logger.log(
-      //   `Победители выбраны для конкурса id=${constestId}: ${winners.join(',')}`,
-      // );
     }
 
     return this._contestParticipationService.updateWinner(winners, constestId);
@@ -374,20 +343,13 @@ export class ContestServiceV2 {
       this.logger.debug(`Конкурс опубликован в: ${JSON.stringify(posts)}`);
 
       if (posts?.length) {
-        // this.logger.log(
-        //   `Удаление сообщений конкурса id=${id} из Telegram: ${posts.length} шт.`,
-        // );
         for (const post of posts) {
           try {
             await this._telegramPostService.deleteMessage(
               post.chatId,
               post.messageId,
             );
-          } catch (err) {
-            // this.logger.warn(
-            //   `Не удалось удалить сообщение ${post.chatId}:${post.messageId}`,
-            // );
-          }
+          } catch (err) {}
         }
       }
 
@@ -403,10 +365,6 @@ export class ContestServiceV2 {
         ScheduledTaskType.CONTEST_FINISH,
         id,
       );
-
-      // this.logger.debug(
-      //   `Найдены таски: {taskPub: ${JSON.stringify(taskPub)}, taskFin: ${JSON.stringify(taskFin)}}`,
-      // );
 
       if (taskPub) {
         this.logger.debug(`Удаление задачи из бд`);
@@ -456,9 +414,6 @@ export class ContestServiceV2 {
       );
     }
 
-    // this.logger.log(
-    //   `Сообщения конкурса id=${contest.id} опубликованы: ${telegramMessageIds.join(',')}`,
-    // );
     return telegramMessageIds;
   }
 

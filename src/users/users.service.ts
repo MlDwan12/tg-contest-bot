@@ -41,42 +41,6 @@ export class UsersService {
       `findOrCreate: telegramId=${telegramId}, username=${username}`,
     );
 
-    // let user = await this.userRepo.findOne({
-    //   where: { telegramId },
-    //   select: ['id', 'telegramId', 'username'],
-    // });
-
-    // if (user) {
-    //   // //this.logger.log(
-    //   //   `Пользователь найден: id=${user.id}, username=${user.username}`,
-    //   // );
-    //   return user;
-    // }
-
-    // this.logger.warn(
-    //   `Пользователь не найден, создаём нового telegramId=${telegramId}`,
-    // );
-
-    // try {
-    //   user = await this.userRepo.save(
-    //     this.userRepo.create({ telegramId, username }),
-    //   );
-    //   // //this.logger.log(
-    //   //   `Новый пользователь создан: id=${user.id}, username=${user.username}`,
-    //   // );
-    // } catch (error) {
-    //   this.logger.error(
-    //     `Ошибка при создании пользователя telegramId=${telegramId}: ${error.message}`,
-    //     error.stack,
-    //   );
-    //   user = await this.userRepo.findOne({ where: { telegramId } });
-    //   if (!user) throw error;
-    // }
-
-    // return user;
-
-    // const telegramId = String(tgUser.telegramId);
-    // const username = tgUser.userName;
     // спорный момент пропуск в 2 раза ниже но потребление памяти в 2 раза ниже
     const [user] = await this.userRepo.query(
       `
@@ -118,9 +82,6 @@ export class UsersService {
       order: { id: 'ASC' },
     });
 
-    // //this.logger.log(
-    //   `Найдено пользователей: count=${users.length}, total=${total}`,
-    // );
     return { users, total };
   }
 
@@ -205,8 +166,6 @@ export class UsersService {
 
   async broadcast(dto: BroadcastDto) {
     try {
-      //this.logger.log(`broadcast: старт, параметры=${JSON.stringify(dto)}`);
-
       let targets: { telegramId: string }[] | number[] = [];
 
       const contest = dto.contestId
@@ -250,7 +209,6 @@ export class UsersService {
           messageId && !dto.imageUrl ? contest.imageUrl : dto.imageUrl,
         );
         targets = [{ telegramId: user.telegramId }];
-        //this.logger.log(`broadcast: режим=USER, userId=${user.telegramId}`);
       }
 
       if (dto.type === BroadcastType.GROUP) {
@@ -298,17 +256,9 @@ export class UsersService {
                   messageId,
                   messageId && !dto.imageUrl ? contest.imageUrl : dto.imageUrl,
                 )
-                .then(() => {
-                  // //this.logger.log(
-                  //   `Сообщение отправлено пользователю telegramId=${u.telegramId}`,
-                  // );
-                }),
+                .then(() => {}),
             ),
         );
-
-        // //this.logger.log(
-        //   `broadcast: режим=GROUP, group=${dto.channelId}, пользователей=${targets.length}`,
-        // );
       }
 
       if (dto.type === BroadcastType.ALL) {
@@ -333,20 +283,10 @@ export class UsersService {
                 messageId,
                 messageId && !dto.imageUrl ? contest.imageUrl : dto.imageUrl,
               );
-              // //this.logger.log(
-              //   `Сообщение отправлено пользователю telegramId=${u.telegramId}`,
-              // );
+
               return u.telegramId; // возвращаем telegramId из промиса
             }),
         );
-
-        // теперь targets — это массив всех отправленных telegramId
-        // //this.logger.log(
-        //   `Сообщения отправлены пользователям: ${targets.join(',')}`,
-        // );
-        // //this.logger.log(
-        //   `broadcast: режим=ALL, пользователей=${targets.length}`,
-        // );
       }
 
       return { success: true, total: targets.length };

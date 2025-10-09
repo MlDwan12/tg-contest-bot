@@ -13,9 +13,7 @@ export class PostEditProcessor extends WorkerHost {
   }
 
   async process(job: Job<any, any, string>): Promise<any> {
-    //this.logger.log(`Начало обработки задачи: ${job.id}, name=${job.name}`);
-    this.logger.debug(`Данные задачи: ${JSON.stringify(job.data)}`);
-    this.logger.debug(`Счетчик ===> : ${job.data.clickCount}`);
+    this.logger.log(`Начало обработки задачи: ${job.id}, name=${job.name}`);
 
     try {
       const {
@@ -47,7 +45,6 @@ export class PostEditProcessor extends WorkerHost {
 
       if (job.name === 'edit-admin') {
         // Полное редактирование админом
-        console.log(buttonText);
 
         return await this.telegramService.editPost(
           channelId,

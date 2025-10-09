@@ -502,7 +502,7 @@ export class ContestService {
       let winners: number[] = [];
       this.logger.debug(`Получение id победителей`);
 
-      if (contest.winners?.length) {
+      if (contest.winners?.length && contest?.winnerStrategy === 'manual') {
         this.logger.debug(`Получение победителей, тип конкурса 1`);
 
         winners = contest.winners
@@ -513,11 +513,10 @@ export class ContestService {
           })
           .map((p) => p.id);
       }
-      console.log(1, contest);
 
       if (
         (contest?.participations?.length ?? contest?.participants?.length) &&
-        !contest.winners.length
+        (!contest.winners.length || contest?.winnerStrategy === 'random')
       ) {
         this.logger.debug(`Получение победителей, тип конкурса 2`);
         const randomElements = await this.getRandomElement(

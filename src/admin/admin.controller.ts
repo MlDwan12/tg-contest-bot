@@ -30,9 +30,6 @@ export class AdminController {
 
   @Post()
   async create(@Body() createAdminDto: CreateAdminDto) {
-    // //this.logger.log(
-    //   `Создание администратора: ${JSON.stringify(createAdminDto)}`,
-    // );
     return this.adminService.create(createAdminDto);
   }
 
@@ -58,19 +55,16 @@ export class AdminController {
     @UploadedFile() image?: Express.Multer.File,
   ) {
     if (image) data.imageUrl = `/uploads/broadcast/${image.filename}`;
-    // //this.logger.log(`Отправка рассылки на конкурс`);
     return this.userService.broadcast(data);
   }
 
   @Get()
   async findAll() {
-    // //this.logger.log(`Запрос списка администраторов`);
     return this.adminService.findAll();
   }
 
   @Get(':userName')
   async findOne(@Param('userName') userName: string) {
-    // //this.logger.log(`Поиск администратора по userName=${userName}`);
     return this.adminService.findOne({ userName });
   }
 
