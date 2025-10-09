@@ -68,6 +68,28 @@ export class ContestParticipationService {
       return winners;
     }
 
+    const requiredGroups = contest.allowedGroups?.map((g) => g.name) || [];
+    if (requiredGroups.length > 0) {
+      try {
+        const isSubscribed = await this.telegramService.isUserSubscribed(
+          requiredGroups,
+          Number(user.telegramId),
+        );
+        if (!isSubscribed) {
+          this.logger.warn(
+            `Пользователь ${user.id} не подписан на все обязательные группы конкурса ${contest.id}`,
+          );
+          return { data: [] };
+        }
+      } catch (err) {
+        this.logger.error(
+          `Ошибка проверки подписки для пользователя ${user.id}: ${err.message}`,
+          err.stack,
+        );
+        return { data: [] };
+      }
+    }
+
     const redisKey = `contest:participants:${contest.id}`;
 
     // 🟢 Пытаемся вставить нового участника
