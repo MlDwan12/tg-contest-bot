@@ -21,15 +21,11 @@ import { ContestSyncService } from './contestSyncService';
     }),
     BullModule.registerQueue({
       name: 'post-edit',
-      // limiter: {
-      //   max: 1, // не более 1 задачи
-      //   duration: 1000, // в течение 1 секунды
-      // },
     }),
     RedisModule,
   ],
   controllers: [ContestParticipationController],
-  providers: [ContestParticipationService, ContestSyncService],
+  providers: [ContestParticipationService],
   exports: [ContestParticipationService],
 })
 export class ContestParticipationModule {}

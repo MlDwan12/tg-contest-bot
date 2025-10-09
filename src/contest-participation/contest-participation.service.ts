@@ -43,7 +43,7 @@ export class ContestParticipationService {
       `Регистрация участия: userId=${user.id}, contestId=${contest.id}, groupId=${groupId}, status=${status}`,
     );
 
-    // Проверка, если конкурс завершён
+    // 🟠 Проверка — конкурс завершён
     if (contest.status === 'completed') {
       this.logger.warn(
         `Попытка регистрации в завершённый конкурс id=${contest.id}`,
@@ -68,10 +68,9 @@ export class ContestParticipationService {
       return winners;
     }
 
-    const participantBefore = contest.participations.length;
     const redisKey = `contest:participants:${contest.id}`;
 
-    // Используем транзакцию: вставляем только если ещё нет записи
+    // 🟢 Пытаемся вставить нового участника
     const insertResult = await this.participationRepo.query(
       `
     INSERT INTO contest_participations("userId", "contestId", "status", "groupId")
@@ -82,63 +81,77 @@ export class ContestParticipationService {
       [user.id, contest.id, status, groupId],
     );
 
-    const isNewParticipant = insertResult.length > 0;
+    let currentCount: number;
 
-    // Только если реально вставили нового участника — инкремент Redis
-    if (isNewParticipant) {
-      await this.redisClient.set(
-        redisKey,
-        Number(participantBefore + 1),
-        'EX',
-        60,
-      );
-      await this.redisClient.expire(redisKey, 60); // TTL на сутки
+    if (insertResult.length > 0) {
+      // Новый уникальный участник
+      currentCount = await this.redisClient.incr(redisKey);
+      await this.redisClient.expire(redisKey, 60 * 60 * 24); // TTL на сутки
     } else {
-      // Если участник уже был, можно подтянуть Redis из базы
-      const countResult = await this.participationRepo.query(
-        `SELECT COUNT(*) AS participant_count FROM contest_participations WHERE "contestId" = $1`,
-        [contest.id],
-      );
-      await this.redisClient.set(
-        redisKey,
-        Number(countResult[0].participant_count),
-        'EX',
-        60 * 60 * 24,
-      );
+      // Уже существующий участник — проверяем Redis
+      currentCount = await this.redisClient
+        .get(redisKey)
+        .then((v) => Number(v));
+      if (!currentCount) {
+        const countResult = await this.participationRepo.query(
+          `SELECT COUNT(*) AS participant_count FROM contest_participations WHERE "contestId" = $1`,
+          [contest.id],
+        );
+        currentCount = Number(countResult[0].participant_count);
+        await this.redisClient.set(redisKey, currentCount, 'EX', 60 * 60 * 24);
+      }
     }
 
-    // Берём актуальное количество участников из базы
-    const countResult = await this.participationRepo.query(
-      `SELECT COUNT(*) AS participant_count FROM contest_participations WHERE "contestId" = $1`,
-      [contest.id],
-    );
-    const dbCount = Number(countResult[0].participant_count);
+    this.logger.log(`Текущий счётчик участников (Redis): ${currentCount}`);
 
-    // Обновляем посты в Telegram только если количество участников увеличилось
-    if (contest.telegramMessageIds && dbCount > participantBefore) {
-      this.logger.log(
-        `Обновление счётчика участников в постах: contestId=${contest.id}, count=${dbCount}`,
-      );
+    // 🟣 Обновляем посты в Telegram
+    if (contest.telegramMessageIds && currentCount > 0) {
+      const messagePairs = contest.telegramMessageIds.split(',');
 
-      contest.telegramMessageIds.split(',').forEach((e) => {
-        const [channel, message] = e.split(':');
+      for (const pair of messagePairs) {
+        const [channel, message] = pair.split(':');
         const jobId = `update-post-${contest.id}-${message}`;
-        void this.telegramEditQueue.getJob(jobId).then((existingJob) => {
+
+        try {
+          const existingJob = await this.telegramEditQueue.getJob(jobId);
+
+          const jobData = {
+            channelId: channel,
+            messageId: Number(message),
+            contest,
+            buttonText: contest?.buttonText,
+            clickCount: currentCount,
+          };
+
           if (!existingJob) {
-            this.telegramEditQueue.add(
-              'edit-counter',
-              {
-                channelId: channel,
-                messageId: Number(message),
-                contest,
-                buttonText: contest?.buttonText,
-                clickCount: dbCount,
-              },
-              { delay: 5000, jobId, removeOnComplete: true },
+            await this.telegramEditQueue.add('edit-counter', jobData, {
+              delay: 3000,
+              jobId,
+              removeOnComplete: true,
+              removeOnFail: true,
+            });
+            this.logger.debug(
+              `Добавлена новая задача Telegram обновления (${jobId})`,
+            );
+          } else {
+            await existingJob.remove();
+            await this.telegramEditQueue.add('edit-counter', jobData, {
+              delay: 3000,
+              jobId,
+              removeOnComplete: true,
+              removeOnFail: true,
+            });
+            this.logger.debug(
+              `Задача Telegram обновления (${jobId}) обновлена через пересоздание`,
             );
           }
-        });
-      });
+        } catch (err) {
+          this.logger.error(
+            `Ошибка при обновлении Telegram-задачи: ${err.message}`,
+            err.stack,
+          );
+        }
+      }
     }
 
     return [];

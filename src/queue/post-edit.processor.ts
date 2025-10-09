@@ -24,14 +24,13 @@ export class PostEditProcessor extends WorkerHost {
         newName,
         newText,
         newImageUrl,
+        clickCount,
       } = job.data;
       console.log(job.name);
-      console.log(job.data);
+      console.log('clickCount====>', clickCount);
 
       if (job.name === 'edit-counter') {
         // Только обновляем кнопку/счётчик
-        console.log(contest);
-
         return await this.telegramService.editPost(
           channelId,
           messageId,
@@ -40,7 +39,7 @@ export class PostEditProcessor extends WorkerHost {
           undefined,
           undefined,
           buttonText,
-          job.data.clickCount,
+          clickCount,
         );
       }
 

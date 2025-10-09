@@ -36,12 +36,12 @@ async function ensureAutocannon() {
 
   const TARGET = 'http://localhost:3006';
   const PATH = '/contest-participation';
-  const DURATION = 30; // seconds
-  const CONNECTIONS = 150;
-  const UNIQUE_USERS = 900;
+  const DURATION = 60; // seconds
+  const CONNECTIONS = 100;
+  const UNIQUE_USERS = 300;
 
   // fixed fields
-  const CONTEST_ID = 15;
+  const CONTEST_ID = 19;
   const GROUP_ID = -1002956637345;
   const BASE_TELEGRAM = 7604827593; // will increment from this base
 
