@@ -40,10 +40,10 @@ export class ContestParticipationService {
       `Регистрация участия: userId=${user.id}, contestId=${contest.id}, groupId=${groupId}, status=${status}`,
     );
 
-    await this.telegramQueue.add('subscription-check', {
-      telegramId: user.telegramId,
-      requiredGroups: contest.requiredGroups,
-    });
+    // await this.telegramQueue.add('subscription-check', {
+    //   telegramId: user.telegramId,
+    //   requiredGroups: contest.requiredGroups,
+    // });
 
     const participantBefore = contest.participations.length;
 
@@ -105,6 +105,7 @@ export class ContestParticipationService {
       void Promise.all(
         contest.telegramMessageIds.split(',').map((e) => {
           const [channel, message] = e.split(':');
+
           return this.telegramEditQueue.add('edit-counter', {
             channelId: channel,
             messageId: Number(message),

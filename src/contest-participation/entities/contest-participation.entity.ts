@@ -1,6 +1,12 @@
 import { Contest } from 'src/contest/entities/contest.entity';
 import { User } from 'src/users/entities/user.entity';
-import { Entity, PrimaryGeneratedColumn, ManyToOne, Column, Unique } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  ManyToOne,
+  Column,
+  Unique,
+} from 'typeorm';
 
 @Entity('contest_participations')
 @Unique('contest_participations_user_contest_unique', ['user', 'contest'])
