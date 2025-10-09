@@ -15,6 +15,8 @@ import { TelegramService } from 'src/telegram/telegram.service';
 import { ContestService } from 'src/contest/contest.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { InjectRedis } from '@nestjs-modules/ioredis';
+import Redis from 'ioredis';
 
 @Injectable()
 export class ContestParticipationService {
@@ -28,6 +30,7 @@ export class ContestParticipationService {
     private contestService: ContestService,
     @InjectQueue('subscription-check') private readonly telegramQueue: Queue,
     @InjectQueue('post-edit') private readonly telegramEditQueue: Queue,
+    @InjectRedis() private readonly redisClient: Redis,
   ) {}
 
   async registerParticipation(
@@ -40,84 +43,102 @@ export class ContestParticipationService {
       `Регистрация участия: userId=${user.id}, contestId=${contest.id}, groupId=${groupId}, status=${status}`,
     );
 
-    // await this.telegramQueue.add('subscription-check', {
-    //   telegramId: user.telegramId,
-    //   requiredGroups: contest.requiredGroups,
-    // });
-
-    const participantBefore = contest.participations.length;
-
+    // Проверка, если конкурс завершён
     if (contest.status === 'completed') {
       this.logger.warn(
         `Попытка регистрации в завершённый конкурс id=${contest.id}`,
       );
-      // const winners = await this.participationRepo.query(
-      //   `
-      //   SELECT id, "contestId", status, "prizePlace"
-      //   FROM contest_participations
-      //   WHERE "contestId" = $1 AND status = 'winner'
-      // `,
-      //   [contest.id],
-      // );
 
       const winners = await this.participationRepo.query(
         `
-          SELECT 
-            cp.id,
-            cp."contestId",
-            cp.status,
-            cp."prizePlace",
-            u.id AS "userId",
-            u.username,
-            u."telegramId"
-          FROM contest_participations cp
-          JOIN users u ON u.id = cp."userId"
-          WHERE cp."contestId" = $1 AND cp.status = 'winner'
-        `,
+      SELECT 
+        cp.id,
+        cp."contestId",
+        cp.status,
+        cp."prizePlace",
+        u.id AS "userId",
+        u.username,
+        u."telegramId"
+      FROM contest_participations cp
+      JOIN users u ON u.id = cp."userId"
+      WHERE cp."contestId" = $1 AND cp.status = 'winner'
+      `,
         [contest.id],
       );
       return winners;
     }
 
-    await this.participationRepo.query(
+    const participantBefore = contest.participations.length;
+    const redisKey = `contest:participants:${contest.id}`;
+
+    // Используем транзакцию: вставляем только если ещё нет записи
+    const insertResult = await this.participationRepo.query(
       `
-      INSERT INTO contest_participations("userId", "contestId", "status", "groupId")
-      VALUES ($1, $2, $3, $4)
-      ON CONFLICT("userId", "contestId") DO UPDATE
-      SET "status" = EXCLUDED."status", "groupId" = EXCLUDED."groupId"
+    INSERT INTO contest_participations("userId", "contestId", "status", "groupId")
+    VALUES ($1, $2, $3, $4)
+    ON CONFLICT("userId", "contestId") DO NOTHING
+    RETURNING id
     `,
       [user.id, contest.id, status, groupId],
     );
 
+    const isNewParticipant = insertResult.length > 0;
+
+    // Только если реально вставили нового участника — инкремент Redis
+    if (isNewParticipant) {
+      await this.redisClient.set(
+        redisKey,
+        Number(participantBefore + 1),
+        'EX',
+        60,
+      );
+      await this.redisClient.expire(redisKey, 60); // TTL на сутки
+    } else {
+      // Если участник уже был, можно подтянуть Redis из базы
+      const countResult = await this.participationRepo.query(
+        `SELECT COUNT(*) AS participant_count FROM contest_participations WHERE "contestId" = $1`,
+        [contest.id],
+      );
+      await this.redisClient.set(
+        redisKey,
+        Number(countResult[0].participant_count),
+        'EX',
+        60 * 60 * 24,
+      );
+    }
+
+    // Берём актуальное количество участников из базы
     const countResult = await this.participationRepo.query(
-      `SELECT COUNT(*) AS participant_count
-       FROM contest_participations
-       WHERE "contestId" = $1`,
+      `SELECT COUNT(*) AS participant_count FROM contest_participations WHERE "contestId" = $1`,
       [contest.id],
     );
+    const dbCount = Number(countResult[0].participant_count);
 
-    const participantCount = Number(countResult[0].participant_count);
-
-    if (contest.telegramMessageIds && participantCount > participantBefore) {
+    // Обновляем посты в Telegram только если количество участников увеличилось
+    if (contest.telegramMessageIds && dbCount > participantBefore) {
       this.logger.log(
-        `Обновление счётчика участников в постах: contestId=${contest.id}, count=${participantCount}`,
+        `Обновление счётчика участников в постах: contestId=${contest.id}, count=${dbCount}`,
       );
-      void Promise.all(
-        contest.telegramMessageIds.split(',').map((e) => {
-          const [channel, message] = e.split(':');
 
-          return this.telegramEditQueue.add('edit-counter', {
-            channelId: channel,
-            messageId: Number(message),
-            contest,
-            buttonText: contest?.buttonText,
-            newName: undefined,
-            newText: undefined,
-            newImageUrl: undefined,
-            clickCount: participantCount,
-          });
-        }),
-      );
+      contest.telegramMessageIds.split(',').forEach((e) => {
+        const [channel, message] = e.split(':');
+        const jobId = `update-post-${contest.id}-${message}`;
+        void this.telegramEditQueue.getJob(jobId).then((existingJob) => {
+          if (!existingJob) {
+            this.telegramEditQueue.add(
+              'edit-counter',
+              {
+                channelId: channel,
+                messageId: Number(message),
+                contest,
+                buttonText: contest?.buttonText,
+                clickCount: dbCount,
+              },
+              { delay: 5000, jobId, removeOnComplete: true },
+            );
+          }
+        });
+      });
     }
 
     return [];

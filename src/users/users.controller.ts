@@ -83,7 +83,7 @@ export class UsersController {
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 50,
   ) {
-    const users = await this.usersService.getUsersStats();
+    const users = await this.usersService.getUsersStats(page, limit);
 
     return users;
   }

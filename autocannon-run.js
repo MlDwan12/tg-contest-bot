@@ -1,73 +1,100 @@
 /**
  * autocannon-run.js
- * Usage: node autocannon-run.js
  *
- * Генерирует 1000 уникальных тел и прогоняет нагрузочный тест:
- * - connections: 300
- * - duration: 30s
- * - POST на /contest-participation
+ * Usage:
+ *   node autocannon-run.js
+ *
+ * This script:
+ *  - builds 100 unique request bodies (unique telegramId & userName)
+ *  - runs autocannon with connections=100, duration=30s, POST requests to /contest-participation
  */
 
-const autocannon = require('autocannon');
+const fs = require('fs');
 
-const TARGET = 'http://localhost:3006';
-const PATH = '/contest-participation';
-const DURATION = 30; // seconds
-const CONNECTIONS = 300;
-const UNIQUE_USERS = 1000;
-const CONTEST_ID = 11;
-const GROUP_ID = -1002956637345;
+async function ensureAutocannon() {
+  try {
+    require.resolve('autocannon');
+    return true;
+  } catch (e) {
+    console.log('autocannon not found, installing locally (npm i autocannon)...');
+    const { execSync } = require('child_process');
+    try {
+      execSync('npm i autocannon --no-audit --no-fund', { stdio: 'inherit' });
+      return true;
+    } catch (err) {
+      console.error('Failed to install autocannon. Install manually: npm i autocannon');
+      return false;
+    }
+  }
+}
 
-// Генерируем 1000 уникальных тел
-const bodies = Array.from({ length: UNIQUE_USERS }, (_, i) => {
-  return JSON.stringify({
-    contestId: CONTEST_ID,
-    telegramId: 876552900 + i,               // уникальный telegramId
-    userName: `user_${i}`,                   // уникальный userName
-    groupId: GROUP_ID,
+(async () => {
+  const has = await ensureAutocannon();
+  if (!has) process.exit(1);
+
+  const autocannon = require('autocannon');
+
+  const TARGET = 'http://localhost:3006';
+  const PATH = '/contest-participation';
+  const DURATION = 30; // seconds
+  const CONNECTIONS = 150;
+  const UNIQUE_USERS = 900;
+
+  // fixed fields
+  const CONTEST_ID = 15;
+  const GROUP_ID = -1002956637345;
+  const BASE_TELEGRAM = 7604827593; // will increment from this base
+
+  // build 100 unique bodies
+  const bodies = Array.from({ length: UNIQUE_USERS }, (_, i) => {
+    return JSON.stringify({
+      contestId: CONTEST_ID,
+      telegramId: BASE_TELEGRAM + i, // unique per user
+      userName: `MlDwan_${i}`, // unique userName per user
+      groupId: GROUP_ID,
+    });
   });
-});
 
-// Собираем requests — autocannon будет циклично их отправлять
-const requests = bodies.map((body) => ({
-  method: 'POST',
-  path: PATH,
-  body,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-}));
+  // build requests array for autocannon
+  const requests = bodies.map((body) => ({
+    method: 'POST',
+    path: PATH,
+    body,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  }));
 
-console.log(`Starting autocannon:
-  url: ${TARGET}${PATH}
+  console.log(`Starting autocannon: ${TARGET}${PATH}
   connections: ${CONNECTIONS}
   duration: ${DURATION}s
   unique bodies: ${UNIQUE_USERS}
 `);
 
-const instance = autocannon(
-  {
-    url: TARGET,
-    connections: CONNECTIONS,
-    duration: DURATION,
-    requests, // передаём массив уникальных запросов
-    // можно настроить timeout/headers здесь, если нужно
-  },
-  (err, result) => {
-    if (err) {
-      console.error('Autocannon error:', err);
-      process.exitCode = 2;
-      return;
-    }
-    console.log('\n--- Benchmark finished ---');
-    console.log('Requests:', result.requests);
-    console.log('Latency (ms):', result.latency);
-    console.log('Errors:', result.errors);
-    console.log('Non-2xx responses:', result['non2xx']);
-    // вывод подробного JSON-результата (если нужно)
-    // console.log(JSON.stringify(result, null, 2));
-  },
-);
+  const inst = autocannon(
+    {
+      url: TARGET,
+      connections: CONNECTIONS,
+      duration: DURATION,
+      requests,
+      // optional tweaks:
+      // timeout: 10000,
+      // pipelining: 1,
+    },
+    (err, result) => {
+      if (err) {
+        console.error('Autocannon error:', err);
+        process.exitCode = 2;
+        return;
+      }
+      console.log('\n--- Benchmark finished ---');
+      console.log('Requests:', result.requests);
+      console.log('Latency (ms):', result.latency);
+      console.log('Errors:', result.errors);
+      console.log('Non-2xx responses:', result['non2xx']);
+    },
+  );
 
-// печать прогресса в реальном времени
-autocannon.track(instance, { renderProgressBar: true });
+  // print progress bar to stdout
+  autocannon.track(inst, { renderProgressBar: true });
+})();

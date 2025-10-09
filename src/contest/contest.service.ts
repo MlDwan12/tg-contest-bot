@@ -227,6 +227,8 @@ export class ContestService {
         ),
       ]);
     this.logger.debug(`Получен конкурс с id=${id} для клиента`);
+    console.log(participations.length);
+
     const { telegramMessageIds, ...otherInfo } = contest[0];
     return {
       ...otherInfo,

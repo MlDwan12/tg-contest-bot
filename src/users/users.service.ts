@@ -88,16 +88,22 @@ export class UsersService {
   async getUsersStats(page = 1, limit = 50) {
     this.logger.debug(`getUsersStats: page=${page}, limit=${limit}`);
 
-    const users = await this.userRepo
+    const [users, totalCount] = await this.userRepo
       .createQueryBuilder('user')
       .select(['user.id', 'user.username', 'user.telegramId'])
       .skip((page - 1) * limit)
       .take(limit)
-      .getMany();
+      .getManyAndCount(); // <- получаем сразу и количество всех пользователей
 
     if (!users.length) {
       this.logger.warn(`getUsersStats: пользователей нет`);
-      return [];
+      return {
+        data: [],
+        page,
+        limit,
+        totalPages: 0,
+        totalCount: 0,
+      };
     }
 
     const userIds = users.map((u) => u.id);
@@ -153,7 +159,7 @@ export class UsersService {
       }
     });
 
-    return Object.values(userMap).map((u) => ({
+    const data = Object.values(userMap).map((u) => ({
       id: u.id,
       username: u.username,
       telegramId: u.telegramId,
@@ -162,6 +168,15 @@ export class UsersService {
         .sort(([, a], [, b]) => (b as number) - (a as number))
         .map(([name]) => name),
     }));
+
+    const totalPages = Math.ceil(totalCount / limit);
+
+    return {
+      data,
+      page,
+      limit,
+      totalPages,
+    };
   }
 
   async broadcast(dto: BroadcastDto) {

@@ -7,6 +7,8 @@ import { UsersModule } from 'src/users/users.module';
 import { ContestModule } from 'src/contest/contest.module';
 import { TelegramModule } from 'src/telegram/telegram.module';
 import { BullModule } from '@nestjs/bullmq';
+import { RedisModule } from 'src/core/redis/redis.module';
+import { ContestSyncService } from './contestSyncService';
 
 @Module({
   imports: [
@@ -19,10 +21,15 @@ import { BullModule } from '@nestjs/bullmq';
     }),
     BullModule.registerQueue({
       name: 'post-edit',
+      // limiter: {
+      //   max: 1, // не более 1 задачи
+      //   duration: 1000, // в течение 1 секунды
+      // },
     }),
+    RedisModule,
   ],
   controllers: [ContestParticipationController],
-  providers: [ContestParticipationService],
+  providers: [ContestParticipationService, ContestSyncService],
   exports: [ContestParticipationService],
 })
 export class ContestParticipationModule {}

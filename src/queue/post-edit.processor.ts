@@ -30,6 +30,7 @@ export class PostEditProcessor extends WorkerHost {
 
       if (job.name === 'edit-counter') {
         // Только обновляем кнопку/счётчик
+        console.log(contest);
 
         return await this.telegramService.editPost(
           channelId,
