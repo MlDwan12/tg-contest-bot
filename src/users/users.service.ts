@@ -69,31 +69,31 @@ export class UsersService {
     return this.userRepo.find();
   }
 
-  async getAllUsersPag(
-    page = 1,
-    limit = 50,
-  ): Promise<{ users: User[]; total: number }> {
-    this.logger.debug(`getAllUsers: page=${page}, limit=${limit}`);
+  async getUsersStats(page = 1, limit = 50, search?: string) {
+    this.logger.debug(
+      `getUsersStats: page=${page}, limit=${limit}, search=${search || 'none'}`,
+    );
 
-    const [users, total] = await this.userRepo.findAndCount({
-      relations: { participations: true },
-      skip: (page - 1) * limit,
-      take: limit,
-      order: { id: 'ASC' },
-    });
-
-    return { users, total };
-  }
-
-  async getUsersStats(page = 1, limit = 50) {
-    this.logger.debug(`getUsersStats: page=${page}, limit=${limit}`);
-
-    const [users, totalCount] = await this.userRepo
+    const qb = this.userRepo
       .createQueryBuilder('user')
       .select(['user.id', 'user.username', 'user.telegramId'])
       .skip((page - 1) * limit)
-      .take(limit)
-      .getManyAndCount(); // <- получаем сразу и количество всех пользователей
+      .take(limit);
+
+    if (search) {
+      const isNumeric = !isNaN(Number(search));
+      qb.where(
+        `(user.username ILIKE :search OR "user"."telegramId"::text ILIKE :search${
+          isNumeric ? ' OR "user"."id" = :exactId' : ''
+        })`,
+        {
+          search: `%${search}%`,
+          exactId: isNumeric ? Number(search) : undefined,
+        },
+      );
+    }
+
+    const [users, totalCount] = await qb.getManyAndCount();
 
     if (!users.length) {
       this.logger.warn(`getUsersStats: пользователей нет`);
@@ -176,6 +176,7 @@ export class UsersService {
       page,
       limit,
       totalPages,
+      totalCount,
     };
   }
 

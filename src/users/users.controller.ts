@@ -62,6 +62,12 @@ export class UsersController {
     type: Number,
     description: 'Количество пользователей на странице',
   })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Поиск по username или telegramId',
+  })
   @ApiResponse({
     status: 200,
     description: 'Список пользователей с пагинацией',
@@ -82,8 +88,9 @@ export class UsersController {
   async getAllUsers(
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 50,
+    @Query('search') search?: string,
   ) {
-    const users = await this.usersService.getUsersStats(page, limit);
+    const users = await this.usersService.getUsersStats(page, limit, search);
 
     return users;
   }
