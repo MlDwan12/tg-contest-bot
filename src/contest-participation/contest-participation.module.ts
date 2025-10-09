@@ -6,13 +6,20 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsersModule } from 'src/users/users.module';
 import { ContestModule } from 'src/contest/contest.module';
 import { TelegramModule } from 'src/telegram/telegram.module';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([ContestParticipation]),
-    UsersModule,
+    forwardRef(() => TelegramModule),
     forwardRef(() => ContestModule),
-    TelegramModule,
+    forwardRef(() => UsersModule),
+    BullModule.registerQueue({
+      name: 'subscription-check',
+    }),
+    BullModule.registerQueue({
+      name: 'post-edit',
+    }),
   ],
   controllers: [ContestParticipationController],
   providers: [ContestParticipationService],

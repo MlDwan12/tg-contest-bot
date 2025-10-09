@@ -6,6 +6,7 @@ import {
   IsDate,
   IsInt,
   IsPositive,
+  IsDateString,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -66,7 +67,7 @@ export class CreateContestDto {
     example: '2025-09-10T23:59:59Z',
   })
   @Type(() => Date)
-  @IsDate({ message: 'Дата окончания должна быть корректной датой' })
+  @IsDate({ message: 'Дата начала должна быть корректной датой' })
   endDate: Date;
 
   @ApiPropertyOptional({

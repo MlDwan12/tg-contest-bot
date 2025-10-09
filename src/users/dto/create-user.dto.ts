@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsNumber, IsString } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class CreateUserDto {
   @ApiProperty({
@@ -10,11 +10,12 @@ export class CreateUserDto {
   @IsNumber()
   telegramId: number;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Username пользователя (опционально, может быть пустым)',
     example: 'cool_user',
     required: false,
   })
+  @IsOptional()
   @IsString()
   userName?: string;
 }

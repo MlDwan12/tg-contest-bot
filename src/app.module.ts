@@ -13,6 +13,9 @@ import { join } from 'path';
 import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
 import { CronModule } from './cron/cron.module';
+import { BullModule } from '@nestjs/bullmq';
+import { QueueModule } from './queue/queue.module';
+import { QueueCleaner } from './queue/queue-cleaner.service';
 
 @Module({
   imports: [
@@ -31,13 +34,28 @@ import { CronModule } from './cron/cron.module';
         password: configService.get('DATABASE_PASSWORD', ''),
         database: configService.get('DATABASE_NAME'),
         autoLoadEntities: true,
-        synchronize: true,
+        synchronize: false,
+        extra: {
+          max: 50, // по умолчанию часто меньше
+        },
       }),
       inject: [ConfigService],
     }),
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'uploads'),
       serveRoot: '/uploads',
+    }),
+    BullModule.forRoot({
+      connection: {
+        host: 'localhost',
+        port: 6379,
+      },
+    }),
+    BullModule.registerQueue({
+      name: 'post-edit',
+    }),
+    BullModule.registerQueue({
+      name: 'subscription-check',
     }),
     UsersModule,
     ContestModule,
@@ -48,8 +66,9 @@ import { CronModule } from './cron/cron.module';
     AdminModule,
     AuthModule,
     CronModule,
+    QueueModule,
   ],
   controllers: [],
-  providers: [],
+  providers: [QueueCleaner],
 })
 export class AppModule {}

@@ -28,20 +28,34 @@ export class ContestController {
 
   constructor(private readonly contestService: ContestService) {}
 
+  @Get('short-info')
+  getAllContestsShortInfo(): Promise<Contest[]> {
+    //this.logger.log('Получен запрос: список всех конкурсов');
+    return this.contestService.getContestsShortInfo({
+      fields: ['id', 'name', 'startDate', 'endDate', 'status'],
+      include: {
+        creator: ['id', 'userName'],
+        participants: { user: ['telegramId', 'id', 'username'] },
+      },
+    });
+  }
+
   @Get()
-  getAll(): Promise<Contest[]> {
-    this.logger.log('Получен запрос: список всех конкурсов');
-    return this.contestService.getContests();
+  getAllContestsFullInfo(): Promise<Contest[]> {
+    //this.logger.log('Получен запрос: список всех конкурсов');
+    return this.contestService.getContestsFullInfo();
   }
 
   @Get(':id')
-  getById(@Param('id', ParseIntPipe) id: number): Promise<Contest | null> {
-    this.logger.log(`Получен запрос: конкурс id=${id}`);
+  getById(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<Contest | null | undefined> {
+    // //this.logger.log(`Получен запрос: конкурс id=${id}`);
     return this.contestService.getContestById(id);
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard)
   @UseInterceptors(
     FileInterceptor('image', {
       storage: diskStorage({
@@ -63,7 +77,7 @@ export class ContestController {
     @Body() dto: CreateContestDto,
     @UploadedFile() image?: Express.Multer.File,
   ): Promise<Contest> {
-    this.logger.log(`Создание конкурса пользователем id=${userId}`);
+    // //this.logger.log(`Создание конкурса пользователем id=${userId}`);
     if (image) dto.imageUrl = `/uploads/${image.filename}`;
     if (userId) dto.creatorId = userId;
 
@@ -77,7 +91,7 @@ export class ContestController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard)
   @UseInterceptors(
     FileInterceptor('image', {
       storage: diskStorage({
@@ -99,19 +113,19 @@ export class ContestController {
     @Body() dto: UpdateContestDto,
     @UploadedFile() image?: Express.Multer.File,
   ) {
-    this.logger.log(`Обновление конкурса id=${id}`);
+    // //this.logger.log(`Обновление конкурса id=${id}`);
     if (image) dto['imageUrl'] = `/uploads/${image.filename}`;
     return this.contestService.updateContest(id, dto);
   }
 
   @Patch(':id/complete')
-  @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard)
   async complete(@Param('id', ParseIntPipe) id: number) {
     return await this.contestService.completeContest(id);
   }
 
   @Patch(':id/cancel')
-  @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard)
   async cancel(@Param('id', ParseIntPipe) id: number) {
     return await this.contestService.cancelContest(id);
   }

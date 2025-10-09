@@ -14,7 +14,7 @@ import { ChannelService } from './channel.service';
 import { CreateChannelDto } from './dto/create-channel.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 
-@UseGuards(JwtAuthGuard)
+// @UseGuards(JwtAuthGuard)
 @Controller('channels')
 export class ChannelController {
   private readonly logger = new Logger(ChannelController.name);
@@ -24,7 +24,7 @@ export class ChannelController {
   @Get()
   async findAll() {
     try {
-      this.logger.log('Запрос списка каналов');
+      //this.logger.log('Запрос списка каналов');
       return await this.channelService.findAll();
     } catch (error: any) {
       this.logger.error('Ошибка при получении списка каналов', error.stack);
@@ -38,7 +38,7 @@ export class ChannelController {
   @Post()
   async create(@Body() dto: CreateChannelDto) {
     try {
-      this.logger.log(`Создание канала: ${JSON.stringify(dto)}`);
+      // //this.logger.log(`Создание канала: ${JSON.stringify(dto)}`);
       return await this.channelService.create(dto);
     } catch (error: any) {
       this.logger.error(

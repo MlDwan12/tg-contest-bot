@@ -10,18 +10,20 @@ import { ChannelModule } from 'src/channel/channel.module';
 import { AdminModule } from 'src/admin/admin.module';
 import { CronModule } from 'src/cron/cron.module';
 import { UsersModule } from 'src/users/users.module';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Contest, ContestWinner]),
-    ContestParticipationModule,
-    ChannelModule,
+    forwardRef(() => ContestParticipationModule),
+    forwardRef(() => ChannelModule),
     AdminModule,
     forwardRef(() => TelegramModule),
     forwardRef(() => CronModule),
-    forwardRef(() => CronModule),
-    UsersModule,
-    forwardRef(() => ContestParticipationModule),
+    forwardRef(() => UsersModule),
+    BullModule.registerQueue({
+      name: 'post-edit',
+    }),
   ],
   controllers: [ContestController],
   providers: [ContestService],
