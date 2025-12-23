@@ -70,12 +70,13 @@ export class ContestParticipationService {
 
     const requiredGroups = contest.requiredGroups?.map((g) => g.name) || [];
 
-    if (requiredGroups.length > 0) {
-      await this.telegramService.isUserSubscribed(
-        contest.requiredGroups,
-        Number(user.telegramId),
-      );
-    }
+    // 🟡 Проверка — пользователь подписан на все требуемые группы
+    // if (requiredGroups.length > 0) {
+    //   await this.telegramService.isUserSubscribed(
+    //     contest.requiredGroups,
+    //     Number(user.telegramId),
+    //   );
+    // }
 
     const redisKey = `contest:participants:${contest.id}`;
 
@@ -136,28 +137,56 @@ export class ContestParticipationService {
             clickCount: currentCount,
           };
 
-          if (!existingJob) {
-            await this.telegramEditQueue.add('edit-counter', jobData, {
-              delay: 3000,
-              jobId,
-              removeOnComplete: true,
-              removeOnFail: true,
-            });
-            this.logger.debug(
-              `Добавлена новая задача Telegram обновления (${jobId})`,
-            );
+          if (existingJob) {
+            const state = await existingJob.getState();
+
+            if (state === 'active') {
+              this.logger.debug(
+                `Задача ${jobId} уже выполняется. Пропускаем удаление.`,
+              );
+              await this.telegramEditQueue.add('edit-counter', jobData, {
+                delay: 5000,
+              });
+            } else {
+              await existingJob.remove().catch(() => {});
+              await this.telegramEditQueue.add('edit-counter', jobData, {
+                delay: 3000,
+                jobId,
+                removeOnComplete: true,
+                removeOnFail: true,
+              });
+            }
           } else {
-            await existingJob.remove();
             await this.telegramEditQueue.add('edit-counter', jobData, {
               delay: 3000,
               jobId,
               removeOnComplete: true,
               removeOnFail: true,
             });
-            this.logger.debug(
-              `Задача Telegram обновления (${jobId}) обновлена через пересоздание`,
-            );
           }
+
+          // if (!existingJob) {
+          //   await this.telegramEditQueue.add('edit-counter', jobData, {
+          //     delay: 3000,
+          //     jobId,
+          //     removeOnComplete: true,
+          //     removeOnFail: true,
+          //   });
+          //   this.logger.debug(
+          //     `Добавлена новая задача Telegram обновления (${jobId})`,
+          //   );
+          // } else {
+          //   await existingJob.remove();
+          //   await this.telegramEditQueue.add('edit-counter', jobData, {
+          //     delay: 3000,
+          //     jobId,
+          //     removeOnComplete: true,
+          //     removeOnFail: true,
+          //   });
+          //   this.logger.debug(
+          //     `Задача Telegram обновления (${jobId}) обновлена через пересоздание`,
+          //   );
+          // }
         } catch (err) {
           this.logger.error(
             `Ошибка при обновлении Telegram-задачи: ${err.message}`,

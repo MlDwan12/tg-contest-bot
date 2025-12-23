@@ -733,12 +733,12 @@ export class ContestService {
                   this._cronService.getValueByGroupId(msgId, group.telegramId),
                 );
 
-              await this._telegramPostService.sendPrivateMessage(
-                winner.user.telegramId,
-                'Поздравляю, вы победили в конкурсе 🎉',
-                group.telegramName,
-                messageIds[0]!,
-              );
+              // await this._telegramPostService.sendPrivateMessage(
+              //   winner.user.telegramId,
+              //   'Поздравляю, вы победили в конкурсе 🎉',
+              //   group.telegramName,
+              //   messageIds[0]!,
+              // );
             }),
           );
 

@@ -228,15 +228,15 @@ export class CronService {
                 }
 
                 try {
-                  await this._telegramService.sendPrivateMessage(
-                    winner.user.telegramId,
-                    'Поздравляю, вы победили в конкурсе 🎉',
-                    group.telegramName,
-                    messageIds[0]!,
-                  );
-                  this.logger.log(
-                    `ЛС отправлено победителю userId=${winner.user.id}`,
-                  );
+                  // await this._telegramService.sendPrivateMessage(
+                  //   winner.user.telegramId,
+                  //   'Поздравляю, вы победили в конкурсе 🎉',
+                  //   group.telegramName,
+                  //   messageIds[0]!,
+                  // );
+                  // this.logger.log(
+                  //   `ЛС отправлено победителю userId=${winner.user.id}`,
+                  // );
                 } catch (err) {
                   this.logger.error(
                     `Ошибка при отправке ЛС победителю userId=${winner.user.id}: ${err.message}`,
@@ -404,12 +404,12 @@ export class CronService {
                   this.getValueByGroupId(msgId, group.telegramId),
                 );
 
-              await this._telegramService.sendPrivateMessage(
-                winner.user.telegramId,
-                'Поздравляю, вы победили в конкурсе 🎉',
-                group.telegramName,
-                messageIdsArray[0]!,
-              );
+              // await this._telegramService.sendPrivateMessage(
+              //   winner.user.telegramId,
+              //   'Поздравляю, вы победили в конкурсе 🎉',
+              //   group.telegramName,
+              //   messageIdsArray[0]!,
+              // );
             }),
           );
         } catch (error) {
