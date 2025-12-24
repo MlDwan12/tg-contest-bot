@@ -51,7 +51,7 @@ export class ContestParticipationService {
 
       const winners = await this.participationRepo.query(
         `
-      SELECT 
+      SELECT
         cp.id,
         cp."contestId",
         cp.status,
@@ -71,12 +71,12 @@ export class ContestParticipationService {
     const requiredGroups = contest.requiredGroups?.map((g) => g.name) || [];
 
     // 🟡 Проверка — пользователь подписан на все требуемые группы
-    // if (requiredGroups.length > 0) {
-    //   await this.telegramService.isUserSubscribed(
-    //     contest.requiredGroups,
-    //     Number(user.telegramId),
-    //   );
-    // }
+    if (requiredGroups.length > 0) {
+      await this.telegramService.isUserSubscribed(
+        contest.requiredGroups,
+        Number(user.telegramId),
+      );
+    }
 
     const redisKey = `contest:participants:${contest.id}`;
 
