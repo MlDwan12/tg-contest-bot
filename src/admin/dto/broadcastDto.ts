@@ -5,7 +5,9 @@ export class BroadcastDto {
   text: string;
   userTgId?: string;
   contestId?: number;
-  imageUrl?: string;
+  mediaUrl?: string;
   channelId?: string;
   channels?: string;
+  buttonText?: string;
+  buttonUrl?: string;
 }

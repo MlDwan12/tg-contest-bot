@@ -7,6 +7,8 @@ import { ChannelModule } from 'src/channel/channel.module';
 import { TelegramModule } from 'src/telegram/telegram.module';
 import { ContestParticipationModule } from 'src/contest-participation/contest-participation.module';
 import { ContestModule } from 'src/contest/contest.module';
+import { BullModule } from '@nestjs/bullmq';
+import { BroadcastProcessor } from 'src/queue/post-edit.processor';
 
 @Module({
   imports: [
@@ -15,9 +17,12 @@ import { ContestModule } from 'src/contest/contest.module';
     forwardRef(() => ChannelModule),
     forwardRef(() => ContestParticipationModule),
     ContestModule,
+    BullModule.registerQueue({
+      name: 'broadcast',
+    }),
   ],
   controllers: [UsersController],
-  providers: [UsersService],
+  providers: [UsersService, BroadcastProcessor],
   exports: [UsersService],
 })
 export class UsersModule {}

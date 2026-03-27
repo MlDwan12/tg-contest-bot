@@ -227,6 +227,7 @@ export class ContestService {
         ),
       ]);
     this.logger.debug(`Получен конкурс с id=${id} для клиента`);
+
     const { telegramMessageIds, ...otherInfo } = contest[0];
     return {
       ...otherInfo,
@@ -301,7 +302,7 @@ export class ContestService {
       if (savedContest.allowedGroups?.length && !dto.startDate) {
         try {
           const telegramMessageIds = await this._telegramPostService.sendPosts(
-            savedContest.allowedGroups.map((g) => g.id.toString()),
+            savedContest.allowedGroups.map((g) => g.telegramId.toString()),
             `${savedContest.name}\n\n${savedContest.description}`,
             savedContest.imageUrl,
             savedContest.id,
@@ -731,12 +732,12 @@ export class ContestService {
                   this._cronService.getValueByGroupId(msgId, group.telegramId),
                 );
 
-              await this._telegramPostService.sendPrivateMessage(
-                winner.user.telegramId,
-                'Поздравляю, вы победили в конкурсе 🎉',
-                group.telegramName,
-                messageIds[0]!,
-              );
+              // await this._telegramPostService.sendPrivateMessage(
+              //   winner.user.telegramId,
+              //   'Поздравляю, вы победили в конкурсе 🎉',
+              //   group.telegramName,
+              //   messageIds[0]!,
+              // );
             }),
           );
 

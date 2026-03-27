@@ -125,7 +125,7 @@ export class ContestController {
   }
 
   @Patch(':id/cancel')
-  // @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async cancel(@Param('id', ParseIntPipe) id: number) {
     return await this.contestService.cancelContest(id);
   }

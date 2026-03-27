@@ -7,6 +7,8 @@ import { UsersModule } from 'src/users/users.module';
 import { ContestModule } from 'src/contest/contest.module';
 import { TelegramModule } from 'src/telegram/telegram.module';
 import { BullModule } from '@nestjs/bullmq';
+import { RedisModule } from 'src/core/redis/redis.module';
+import { ContestSyncService } from './contestSyncService';
 
 @Module({
   imports: [
@@ -20,6 +22,7 @@ import { BullModule } from '@nestjs/bullmq';
     BullModule.registerQueue({
       name: 'post-edit',
     }),
+    RedisModule,
   ],
   controllers: [ContestParticipationController],
   providers: [ContestParticipationService],

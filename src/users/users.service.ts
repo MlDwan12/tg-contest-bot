@@ -17,6 +17,8 @@ import { ChannelService } from 'src/channel/channel.service';
 import { BroadcastDto } from 'src/admin/dto/broadcastDto';
 import { BroadcastType } from 'src/admin/enums/broadcast.enum';
 import { ContestService } from 'src/contest/contest.service';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 
 @Injectable()
 export class UsersService {
@@ -31,6 +33,9 @@ export class UsersService {
     private readonly _contestParticipationService: ContestParticipationService,
     private readonly _channelService: ChannelService,
     private readonly _contestService: ContestService,
+
+    @InjectQueue('broadcast')
+    private readonly broadcastQueue: Queue,
   ) {}
 
   async findOrCreate(tgUser: CreateUserDto): Promise<User> {
@@ -69,35 +74,41 @@ export class UsersService {
     return this.userRepo.find();
   }
 
-  async getAllUsersPag(
-    page = 1,
-    limit = 50,
-  ): Promise<{ users: User[]; total: number }> {
-    this.logger.debug(`getAllUsers: page=${page}, limit=${limit}`);
+  async getUsersStats(page = 1, limit = 50, search?: string) {
+    this.logger.debug(
+      `getUsersStats: page=${page}, limit=${limit}, search=${search || 'none'}`,
+    );
 
-    const [users, total] = await this.userRepo.findAndCount({
-      relations: { participations: true },
-      skip: (page - 1) * limit,
-      take: limit,
-      order: { id: 'ASC' },
-    });
-
-    return { users, total };
-  }
-
-  async getUsersStats(page = 1, limit = 50) {
-    this.logger.debug(`getUsersStats: page=${page}, limit=${limit}`);
-
-    const users = await this.userRepo
+    const qb = this.userRepo
       .createQueryBuilder('user')
       .select(['user.id', 'user.username', 'user.telegramId'])
       .skip((page - 1) * limit)
-      .take(limit)
-      .getMany();
+      .take(limit);
+
+    if (search) {
+      const isNumeric = !isNaN(Number(search));
+      qb.where(
+        `(user.username ILIKE :search OR "user"."telegramId"::text ILIKE :search${
+          isNumeric ? ' OR "user"."id" = :exactId' : ''
+        })`,
+        {
+          search: `%${search}%`,
+          exactId: isNumeric ? Number(search) : undefined,
+        },
+      );
+    }
+
+    const [users, totalCount] = await qb.getManyAndCount();
 
     if (!users.length) {
       this.logger.warn(`getUsersStats: пользователей нет`);
-      return [];
+      return {
+        data: [],
+        page,
+        limit,
+        totalPages: 0,
+        totalCount: 0,
+      };
     }
 
     const userIds = users.map((u) => u.id);
@@ -153,7 +164,7 @@ export class UsersService {
       }
     });
 
-    return Object.values(userMap).map((u) => ({
+    const data = Object.values(userMap).map((u) => ({
       id: u.id,
       username: u.username,
       telegramId: u.telegramId,
@@ -162,11 +173,22 @@ export class UsersService {
         .sort(([, a], [, b]) => (b as number) - (a as number))
         .map(([name]) => name),
     }));
+
+    const totalPages = Math.ceil(totalCount / limit);
+
+    return {
+      data,
+      page,
+      limit,
+      totalPages,
+      totalCount,
+    };
   }
 
   async broadcast(dto: BroadcastDto) {
     try {
       let targets: { telegramId: string }[] | number[] = [];
+      console.log(dto.channelId);
 
       const contest = dto.contestId
         ? await this._contestService.getContestById(dto.contestId)
@@ -181,41 +203,132 @@ export class UsersService {
         : null;
 
       const channelName = channel ? channel.telegramName : undefined;
+      // console.log(
+      //   '==========>',
+      //   contest,
+      //   contest.telegramMessageIds,
+      //   contest.telegramMessageIds.split(','),
+      // );
 
-      const messageId = contest?.telegramMessageIds
-        ?.find((msg) => msg.split(':')[0] === channel?.telegramId)
-        ?.split(':')[1];
+      // const messageId = contest.telegramMessageIds
+      //   .split(',')
+      //   ?.find((msg) => msg.split(':')[0] === channel?.telegramId)
+      //   ?.split(':')[1];
+      // if (!contest) {
+      //   this.logger.error('broadcast: contest is undefined', dto);
+      //   return;
+      // }
 
+      // if (!contest.telegramMessageIds) {
+      //   this.logger.warn(
+      //     `broadcast: contest ${contest.id} has no telegramMessageIds`,
+      //   );
+      //   return;
+      // }
+      let post;
+      let messageId;
+      let chatId;
+      if (contest)
+        post = contest.telegramMessageIds?.split(',').map((msg) => {
+          const [chatId, msgId] = msg.split(':');
+          return { chatId, msgId };
+        })[0];
+
+      messageId = post?.msgId;
+      chatId = post?.chatId;
+
+      console.log(messageId, chatId);
+
+      await this._telegramService.notifyAdmins(
+        `🚀 Началась рассылка
+
+Тип: ${dto.type}
+Канал: ${channelName ?? '—'}
+Текст: ${dto.text?.slice(0, 200)}${dto.text?.length > 200 ? '…' : ''}
+`,
+      );
       if (dto.type === BroadcastType.USER) {
-        // 🔹 одному пользователю
-        if (!dto.userTgId) {
-          throw new HttpException(
-            'Не указали id пользователя',
-            HttpStatus.BAD_REQUEST,
-          );
-        }
-        const user = await this.getUserByTgId(dto.userTgId);
+        const user = await this.getUserByTgId(dto.userTgId!);
+        if (!user) return { success: false, message: 'User not found' };
 
-        if (!user) {
-          this.logger.warn(`broadcast: пользователь ${dto.userTgId} не найден`);
-          return { success: false, message: 'User not found' };
-        }
+        const broadcastId = Date.now();
+        console.log(
+          `[Broadcast] Запуск рассылки broadcastId=${broadcastId}, пользователей=${user.telegramId}`,
+        );
 
-        await this._telegramService.sendPrivateMessage(
-          user.telegramId,
-          dto.text,
-          channelName,
-          messageId,
-          messageId && !dto.imageUrl ? contest.imageUrl : dto.imageUrl,
+        await this.broadcastQueue.add(
+          'send-message',
+          {
+            broadcastId,
+            telegramId: user.telegramId,
+            text: dto.text,
+            channelName,
+            messageId,
+            photoUrl: dto.mediaUrl?.endsWith('.mp4') ? undefined : dto.mediaUrl,
+            videoNoteUrl: dto.mediaUrl?.endsWith('.mp4')
+              ? dto.mediaUrl
+              : undefined,
+            buttonText: dto.buttonText,
+            buttonUrl: dto.buttonUrl,
+          },
+          { attempts: 3 },
         );
         targets = [{ telegramId: user.telegramId }];
       }
+      //////////////////
+      // if (dto.type === BroadcastType.USER) {
+      //   // 🔹 одному пользователю
+      //   if (!dto.userTgId) {
+      //     throw new HttpException(
+      //       'Не указали id пользователя',
+      //       HttpStatus.BAD_REQUEST,
+      //     );
+      //   }
+      //   const user = await this.getUserByTgId(dto.userTgId);
 
+      //   if (!user) {
+      //     this.logger.warn(`broadcast: пользователь ${dto.userTgId} не найден`);
+      //     return { success: false, message: 'User not found' };
+      //   }
+
+      //   // await this._telegramService.sendPrivateMessage(
+      //   //   user.telegramId,
+      //   //   dto.text,
+      //   //   channelName,
+      //   //   messageId,
+      //   //   messageId && !dto.imageUrl ? contest.imageUrl : dto.imageUrl,
+      //   // );
+      //   const broadcastId = Date.now();
+      //   console.log(
+      //     `[Broadcast] Запуск рассылки broadcastId=${broadcastId}, пользователей=${user.telegramId}`,
+      //   );
+      //   await this.broadcastQueue.add(
+      //     'send-message',
+      //     {
+      //       broadcastId,
+      //       telegramId: user.telegramId,
+      //       text: dto.text,
+      //       channelName,
+      //       messageId,
+      //       imageUrl:
+      //         messageId && !dto.imageUrl ? contest?.imageUrl : dto.imageUrl,
+      //       buttonText: dto.buttonText,
+      //       buttonUrl: dto.buttonUrl,
+      //     },
+      //     { attempts: 3 },
+      //   );
+      //   console.log(
+      //     `[Broadcast] Job добавлен: jobId= telegramId=${user.telegramId}`,
+      //   );
+      //   targets = [{ telegramId: user.telegramId }];
+      // }
+      /////////////////
       if (dto.type === BroadcastType.GROUP) {
         // 🔹 всем участникам группы
+
         const channels = await this._channelService.findManyByColumn(
           'telegramId',
-          dto.channels!.split(','),
+          dto.channels ? dto.channels.split(',') : [dto.channelId!],
         );
 
         if (!channels) {
@@ -233,61 +346,244 @@ export class UsersService {
         const uniqueUsers = Array.from(
           new Map(users.map((u) => [u.user.telegramId, u.user])).values(),
         );
+        console.log('uniqueUsers', dto.mediaUrl);
 
         targets = uniqueUsers.map((u) => Number(u.telegramId));
 
-        console.log('Проверка активных юзеров');
+        // console.log('Проверка активных юзеров');
 
-        const checkedUsers = await this._telegramService.areUsersSubscribed(
-          targets,
-          channels,
-        );
+        // const checkedUsers = await this._telegramService.areUsersSubscribed(
+        //   targets,
+        //   channels,
+        // );
+
         console.log('Рассылка');
-
-        await Promise.all(
-          checkedUsers
-            .filter((u) => u.subscribedToAtLeastOne)
-            .map((u) =>
-              this._telegramService
-                .sendPrivateMessage(
-                  u.telegramId,
-                  dto.text,
-                  channelName,
-                  messageId,
-                  messageId && !dto.imageUrl ? contest.imageUrl : dto.imageUrl,
-                )
-                .then(() => {}),
-            ),
+        const broadcastId = Date.now();
+        console.log(
+          `[Broadcast] Запуск рассылки broadcastId=${broadcastId}, пользователей=${targets.length}`,
         );
+
+        for (const u of uniqueUsers) {
+          const job = await this.broadcastQueue.add(
+            'send-message',
+            {
+              broadcastId,
+              telegramId: u.telegramId,
+              text: dto.text,
+              channelName,
+              messageId,
+              photoUrl: dto.mediaUrl?.endsWith('.mp4')
+                ? undefined
+                : dto.mediaUrl,
+              videoNoteUrl: dto.mediaUrl?.endsWith('.mp4')
+                ? dto.mediaUrl
+                : undefined,
+              buttonText: dto.buttonText,
+              buttonUrl: dto.buttonUrl,
+            },
+            {
+              attempts: 5,
+              backoff: { type: 'exponential', delay: 3000 },
+              removeOnComplete: true,
+            },
+          );
+          console.log(
+            `[Broadcast] Job добавлен: jobId=${job.id} telegramId=${u.telegramId}`,
+          );
+        }
+        // for (const u of checkedUsers.filter((u) => u.subscribedToAtLeastOne)) {
+        /////////////
+        // for (const u of uniqueUsers) {
+        //   const job = await this.broadcastQueue.add(
+        //     'send-message',
+        //     {
+        //       broadcastId,
+        //       telegramId: u.telegramId,
+        //       text: dto.text,
+        //       channelName,
+        //       messageId,
+        //       imageUrl:
+        //         messageId && !dto.imageUrl ? contest?.imageUrl : dto.imageUrl,
+        //       buttonText: dto.buttonText,
+        //       buttonUrl: dto.buttonUrl,
+        //     },
+        //     {
+        //       attempts: 5,
+        //       backoff: {
+        //         type: 'exponential',
+        //         delay: 3000,
+        //       },
+        //       removeOnComplete: true,
+        //       removeOnFail: 1000,
+        //     },
+        //   );
+        //   console.log(
+        //     `[Broadcast] Job добавлен: jobId=${job.id} telegramId=${u.telegramId}`,
+        //   );
+        // }
+        ////////////////
+        console.log(
+          `[Broadcast] Все jobs добавлены, broadcastId=${broadcastId}`,
+        );
+        // await Promise.all(
+        //   checkedUsers
+        //     .filter((u) => u.subscribedToAtLeastOne)
+        //     .map(async (u) => {
+        //       try {
+        //         // await this._telegramService.sendPrivateMessage(
+        //         //   u.telegramId,
+        //         //   dto.text,
+        //         //   channelName,
+        //         //   messageId,
+        //         //   messageId && !dto.imageUrl ? contest.imageUrl : dto.imageUrl,
+        //         // );
+        //         await this.broadcastQueue.add(
+        //           'broadcast',
+        //           {
+        //             telegramId: u.telegramId,
+        //             text: dto.text,
+        //             channelName,
+        //             messageId,
+        //             imageUrl:
+        //               messageId && !dto.imageUrl
+        //                 ? contest?.imageUrl
+        //                 : dto.imageUrl,
+        //           },
+        //           {
+        //             attempts: 5,
+        //             backoff: {
+        //               type: 'exponential',
+        //               delay: 3000,
+        //             },
+        //             removeOnComplete: true,
+        //             removeOnFail: 1000,
+        //           },
+        //         );
+        //         successCount++;
+        //       } catch (error) {
+        //         if (error?.response?.error_code === 403) {
+        //           blockedCount++;
+        //           console.log(successCount, blockedCount);
+
+        //           this.logger.warn(
+        //             `broadcast: нельзя написать пользователю ${u.telegramId} (не активировал бота)`,
+        //           );
+        //         } else {
+        //           this.logger.error(
+        //             `broadcast: ошибка отправки ${u.telegramId}: ${error.message}`,
+        //           );
+        //         }
+        //       }
+        //     }),
+        // );
       }
 
       if (dto.type === BroadcastType.ALL) {
         // 🔹 всем пользователям
         const allUsers = await this.getAllUsers();
-        const channels = await this._channelService.findAll();
-        const userIds = allUsers.map((u) => Number(u.telegramId));
+        // const channels = await this._channelService.findAll();
+        // const userIds = allUsers.map((u) => Number(u.telegramId));
 
-        const checkedUsers = await this._telegramService.areUsersSubscribed(
-          userIds,
-          channels,
+        // const checkedUsers = await this._telegramService.areUsersSubscribed(
+        //   userIds,
+        //   channels,
+        // );
+
+        // const activeUsers = checkedUsers.filter(
+        //   (u) => u.subscribedToAtLeastOne,
+        // );
+        const broadcastId = Date.now();
+        console.log(
+          `[Broadcast] Запуск рассылки broadcastId=${broadcastId}, пользователей=${allUsers.length}`,
         );
 
-        const targets = await Promise.all(
-          checkedUsers
-            .filter((u) => u.subscribedToAtLeastOne)
-            .map(async (u) => {
-              await this._telegramService.sendPrivateMessage(
-                u.telegramId,
-                dto.text,
-                channelName,
-                messageId,
-                messageId && !dto.imageUrl ? contest.imageUrl : dto.imageUrl,
-              );
-
-              return u.telegramId; // возвращаем telegramId из промиса
-            }),
+        for (const u of allUsers) {
+          const job = await this.broadcastQueue.add(
+            'send-message',
+            {
+              broadcastId,
+              telegramId: u.telegramId,
+              text: dto.text,
+              channelName,
+              messageId,
+              photoUrl: dto.mediaUrl?.endsWith('.mp4')
+                ? undefined
+                : dto.mediaUrl,
+              videoNoteUrl: dto.mediaUrl?.endsWith('.mp4')
+                ? dto.mediaUrl
+                : undefined,
+              buttonText: dto.buttonText,
+              buttonUrl: dto.buttonUrl,
+            },
+            {
+              attempts: 5,
+              backoff: { type: 'exponential', delay: 3000 },
+              removeOnComplete: true,
+            },
+          );
+          console.log(
+            `[Broadcast] Job добавлен: jobId=${job.id} telegramId=${u.telegramId}`,
+          );
+        }
+        ///////////////
+        // for (const u of activeUsers) {
+        //   const job = await this.broadcastQueue.add(
+        //     'send-message',
+        //     {
+        //       broadcastId,
+        //       telegramId: u.telegramId,
+        //       text: dto.text,
+        //       channelName,
+        //       messageId,
+        //       imageUrl:
+        //         messageId && !dto.imageUrl ? contest?.imageUrl : dto.imageUrl,
+        //       buttonText: dto.buttonText,
+        //       buttonUrl: dto.buttonUrl,
+        //     },
+        //     {
+        //       attempts: 3,
+        //       backoff: { type: 'fixed', delay: 3000 },
+        //       removeOnComplete: true,
+        //     },
+        //   );
+        //   console.log(
+        //     `[Broadcast] Job добавлен: jobId=${job.id} telegramId=${u.telegramId}`,
+        //   );
+        // }
+        ////////////////
+        console.log(
+          `[Broadcast] Все jobs добавлены, broadcastId=${broadcastId}`,
         );
+        // const targets = await Promise.all(
+        //   checkedUsers
+        //     .filter((u) => u.subscribedToAtLeastOne)
+        //     .map(async (u) => {
+        //       await this._telegramService.sendPrivateMessage(
+        //         u.telegramId,
+        //         dto.text,
+        //         channelName,
+        //         messageId,
+        //         messageId && !dto.imageUrl ? contest.imageUrl : dto.imageUrl,
+        //       );
+
+        //       return u.telegramId; // возвращаем telegramId из промиса
+        //     }),
+        // );
       }
+
+      //       await this._telegramService.notifyAdmins(
+      //         `✅ Рассылка завершена
+
+      // Тип: ${dto.type}
+      // Канал: ${channel?.telegramName ?? '—'}
+
+      // 📊 Статистика:
+      // — Всего целевых: ${targets.length}
+      // — Доставлено: ${successCount}
+      // — Недоступны (403): ${blockedCount}
+      // — Ошибки: ${targets.length - successCount - blockedCount}
+      // `,
+      //       );
 
       return { success: true, total: targets.length };
     } catch (error) {

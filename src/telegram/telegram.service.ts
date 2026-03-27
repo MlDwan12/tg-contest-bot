@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { Telegraf, Telegram } from 'telegraf';
 import { InjectBot } from 'nestjs-telegraf';
-import { createReadStream } from 'fs';
+import { createReadStream, existsSync } from 'fs';
 import {
   InlineKeyboardMarkup,
   InputMediaPhoto,
@@ -19,6 +19,7 @@ import { Contest } from 'src/contest/entities/contest.entity';
 import { UsersService } from 'src/users/users.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import * as path from 'path';
 
 type TextMessage = Message.TextMessage;
 type PhotoMessage = Message.PhotoMessage;
@@ -143,7 +144,6 @@ export class TelegramService {
     needCheck: boolean = true,
   ) {
     const results: { chat: string; subscribed: boolean }[] = [];
-    console.log(chats);
 
     for (const chat of chats) {
       try {
@@ -155,6 +155,7 @@ export class TelegramService {
         const subscribed = ['member', 'administrator', 'creator'].includes(
           member.status,
         );
+
         results.push({ chat: chat.telegramName, subscribed });
       } catch (err) {
         this.logger.warn(
@@ -166,7 +167,7 @@ export class TelegramService {
 
     const unsub = results.filter((r) => !r.subscribed).map((r) => r.chat);
     if (unsub.length && needCheck) {
-      const msg = `Вы не подписаны на ${unsub.join(', ')}`;
+      const msg = `Вы не подписаны на ${unsub}`;
       this.logger.warn(msg);
       throw new HttpException(msg, HttpStatus.CONFLICT);
     }
@@ -178,7 +179,7 @@ export class TelegramService {
     users: number[],
     chats: Channel[],
   ): Promise<SubscriptionResult[]> {
-    return Promise.all(
+    return await Promise.all(
       users.map(async (telegramId) => {
         const results = await Promise.allSettled(
           chats.map(async (chat) => {
@@ -187,6 +188,7 @@ export class TelegramService {
                 chat.telegramId,
                 telegramId,
               );
+
               const subscribed = [
                 'member',
                 'administrator',
@@ -226,68 +228,246 @@ export class TelegramService {
 
   async sendPrivateMessage(
     telegramId: number | string,
-    text: string,
+    text?: string,
     channelUsername?: string,
     messageId?: string,
-    photoUrl?: string, // добавляем параметр для изображения
+    photoUrl?: string,
+    videoNoteUrl?: string,
     buttonText?: string,
-  ): Promise<Message.TextMessage | Message.PhotoMessage> {
+    buttonUrl?: string,
+  ): Promise<Message.TextMessage | Message.PhotoMessage | any> {
     try {
-      if (photoUrl) {
-        // Отправляем фото с подписью
-        console.log(photoUrl);
-        const img = createReadStream(`.${photoUrl}`);
+      // ✅ Формируем reply_markup только если есть валидная кнопка
+      let reply_markup: any = undefined;
 
-        return await this.bot.telegram.sendPhoto(
-          telegramId,
-          { source: img },
-          {
-            caption: text,
-            parse_mode: 'HTML',
-            reply_markup:
-              channelUsername && messageId
-                ? {
-                    inline_keyboard: [
-                      [
-                        {
-                          text: buttonText ?? 'Перейти',
-                          url: `https://t.me/${channelUsername}/${messageId}`,
-                        },
-                      ],
-                    ],
-                  }
-                : undefined,
-          },
-        );
-      } else {
-        // Отправляем обычное сообщение
-        return await this.bot.telegram.sendMessage(telegramId, text, {
-          parse_mode: 'HTML',
-          reply_markup:
-            channelUsername && messageId
-              ? {
-                  inline_keyboard: [
-                    [
-                      {
-                        text: 'Перейти к конкурсу',
-                        url: `https://t.me/${channelUsername}/${messageId}`,
-                      },
-                    ],
-                  ],
-                }
-              : undefined,
-        });
+      const url =
+        buttonUrl ||
+        (channelUsername && messageId
+          ? `https://t.me/${channelUsername}/${messageId}`
+          : undefined);
+      if (buttonText && url) {
+        reply_markup = {
+          inline_keyboard: [[{ text: buttonText, url }]],
+        };
       }
+      console.log('отправка в тг сервисе======>', buttonText, url);
+
+      // ✅ VideoNote
+      if (videoNoteUrl) {
+        console.log('мы в отправке видео');
+
+        const videoPath = path.join(
+          process.cwd(),
+          videoNoteUrl.replace(/^\/+/, ''),
+        );
+        if (!existsSync(videoPath)) {
+          this.logger.warn(`Video note file not found: ${videoPath}`);
+          return null;
+        }
+        console.log('video');
+
+        return this.bot.telegram.sendVideoNote(
+          telegramId,
+          { source: createReadStream(videoPath) },
+          { reply_markup },
+        );
+      }
+
+      // ✅ Photo
+      if (photoUrl) {
+        console.log('мы в отправке картинки');
+
+        const photoPath = path.join(
+          process.cwd(),
+          photoUrl.replace(/^\/+/, ''),
+        );
+
+        if (!existsSync(photoPath)) {
+          this.logger.warn(`Photo file not found: ${photoPath}`);
+          return null;
+        }
+        return this.bot.telegram.sendPhoto(
+          telegramId,
+          { source: createReadStream(photoPath) },
+          { caption: text, parse_mode: 'HTML', reply_markup },
+        );
+      }
+
+      // ✅ Text
+      if (!text) {
+        this.logger.warn(`Nothing to send to telegramId=${telegramId}`);
+        return null;
+      }
+      return this.bot.telegram.sendMessage(telegramId, text, {
+        parse_mode: 'HTML',
+        reply_markup,
+      });
     } catch (err) {
       this.logger.error(
         `Ошибка при отправке ЛС пользователю ${telegramId}: ${err.message}`,
         err.stack,
       );
-      throw new HttpException(
-        'Не удалось отправить сообщение в личку',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      throw err;
     }
+    //////////////////
+    // try {
+    //   const replyMarkup =
+    //     (channelUsername && messageId) || (buttonText && buttonUrl)
+    //       ? {
+    //           inline_keyboard: [
+    //             [
+    //               {
+    //                 text: buttonText ?? 'Перейти',
+    //                 url:
+    //                   buttonUrl ??
+    //                   `https://t.me/${channelUsername}/${messageId}`,
+    //               },
+    //             ],
+    //           ],
+    //         }
+    //       : undefined;
+    //   // =========================
+    //   // VIDEO NOTE
+    //   // =========================
+    //   if (videoNoteUrl) {
+    //     const videoPath = path.isAbsolute(videoNoteUrl)
+    //       ? videoNoteUrl
+    //       : path.join(process.cwd(), videoNoteUrl);
+    //     if (!existsSync(videoPath)) {
+    //       this.logger.warn(
+    //         `Video note file not found: ${videoPath}, отправка пропущена`,
+    //       );
+    //       return null; // или просто отправлять текстовое сообщение вместо кружка
+    //     }
+    //     return await this.bot.telegram.sendVideoNote(
+    //       telegramId,
+    //       { source: createReadStream(videoPath) },
+    //       { reply_markup: replyMarkup },
+    //     );
+    //   }
+    //   // =========================
+    //   // PHOTO
+    //   // =========================
+    //   if (photoUrl) {
+    //     const photoPath = path.isAbsolute(photoUrl)
+    //       ? photoUrl
+    //       : path.join(process.cwd(), photoUrl);
+    //     if (!existsSync(photoPath)) {
+    //       throw new Error(`Photo file not found: ${photoPath}`);
+    //     }
+    //     return await this.bot.telegram.sendPhoto(
+    //       telegramId,
+    //       { source: createReadStream(photoPath) },
+    //       {
+    //         caption: text,
+    //         parse_mode: 'HTML',
+    //         reply_markup: replyMarkup,
+    //       },
+    //     );
+    //   }
+    //   // =========================
+    //   // TEXT
+    //   // =========================
+    //   return await this.bot.telegram.sendMessage(telegramId, text, {
+    //     parse_mode: 'HTML',
+    //     reply_markup: replyMarkup,
+    //   });
+    // } catch (err) {
+    //   this.logger.error(
+    //     `Ошибка при отправке ЛС пользователю ${telegramId}: ${err.message}`,
+    //     err.stack,
+    //   );
+    //   throw err;
+    // }
+    ////////
+    // try {
+    //   if (videoNoteUrl) {
+    //     const video = createReadStream(`.${videoNoteUrl}`);
+    //     return await this.bot.telegram.sendVideoNote(
+    //       telegramId,
+    //       { source: video },
+    //       {
+    //         reply_markup:
+    //           (channelUsername && messageId) || (buttonText && buttonUrl)
+    //             ? {
+    //                 inline_keyboard: [
+    //                   [
+    //                     {
+    //                       text: buttonText ?? 'Перейти',
+    //                       url:
+    //                         buttonUrl ??
+    //                         `https://t.me/${channelUsername}/${messageId}`,
+    //                     },
+    //                   ],
+    //                 ],
+    //               }
+    //             : undefined,
+    //       },
+    //     );
+    //   }
+    //   if (photoUrl) {
+    //     // Отправляем фото с подписью
+    //     console.log(photoUrl);
+    //     const img = createReadStream(`.${photoUrl}`);
+    //     return await this.bot.telegram.sendPhoto(
+    //       telegramId,
+    //       { source: img },
+    //       {
+    //         caption: text,
+    //         parse_mode: 'HTML',
+    //         reply_markup:
+    //           channelUsername && messageId
+    //             ? {
+    //                 inline_keyboard: [
+    //                   [
+    //                     {
+    //                       text: buttonText ?? 'Перейти',
+    //                       url:
+    //                         buttonUrl ??
+    //                         `https://t.me/${channelUsername}/${messageId}`,
+    //                     },
+    //                   ],
+    //                 ],
+    //               }
+    //             : undefined,
+    //       },
+    //     );
+    //   } else {
+    //     // Отправляем обычное сообщение
+    //     console.log('Отправка обычного сообщения:', {
+    //       telegramId,
+    //       text,
+    //       channelUsername,
+    //       messageId,
+    //       buttonText,
+    //       buttonUrl,
+    //     });
+    //     return await this.bot.telegram.sendMessage(telegramId, text, {
+    //       parse_mode: 'HTML',
+    //       reply_markup:
+    //         (channelUsername && messageId) || (buttonText && buttonUrl)
+    //           ? {
+    //               inline_keyboard: [
+    //                 [
+    //                   {
+    //                     text: buttonText ?? 'Перейти к конкурсу',
+    //                     url:
+    //                       buttonUrl ??
+    //                       `https://t.me/${channelUsername}/${messageId}`,
+    //                   },
+    //                 ],
+    //               ],
+    //             }
+    //           : undefined,
+    //     });
+    //   }
+    // } catch (err) {
+    //   this.logger.error(
+    //     `Ошибка при отправке ЛС пользователю ${telegramId}: ${err.message}`,
+    //     err.stack,
+    //   );
+    //   throw err;
+    // }
   }
 
   async editPost(
@@ -468,5 +648,23 @@ export class TelegramService {
         },
       );
     }
+  }
+
+  async notifyAdmins(text: string) {
+    const admins = (process.env.ADMIN_IDS ?? '')
+      .split(',')
+      .map((id) => Number(id.trim()))
+      .filter((id) => !isNaN(id));
+    await Promise.all(
+      admins.map(async (adminId) => {
+        try {
+          await this.sendPrivateMessage(adminId, text);
+        } catch (e) {
+          this.logger.warn(
+            `Не удалось уведомить админа ${adminId}: ${e.message}`,
+          );
+        }
+      }),
+    );
   }
 }

@@ -51,12 +51,17 @@ import { QueueCleaner } from './queue/queue-cleaner.service';
         port: 6379,
       },
     }),
-    BullModule.registerQueue({
-      name: 'post-edit',
-    }),
-    BullModule.registerQueue({
-      name: 'subscription-check',
-    }),
+    BullModule.registerQueue(
+      {
+        name: 'post-edit',
+      },
+      {
+        name: 'subscription-check',
+      },
+      {
+        name: 'broadcast',
+      },
+    ),
     UsersModule,
     ContestModule,
     ContestParticipationModule,

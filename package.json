@@ -22,6 +22,10 @@
     "migration:generate": "npx typeorm migration:generate ./src/database/migrations/ПЕРЕИМЕНУЙ-МЕНЯ -d ./dist/database/data-source.js"
   },
   "dependencies": {
+    "@bull-board/api": "^6.16.4",
+    "@bull-board/express": "^6.16.4",
+    "@bull-board/nestjs": "^6.16.4",
+    "@nestjs-modules/ioredis": "^2.0.2",
     "@nestjs/bullmq": "^11.0.3",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",
@@ -37,6 +41,7 @@
     "@telegraf/session": "^2.0.0-beta.7",
     "@types/joi": "^17.2.3",
     "bcrypt": "^6.0.0",
+    "bottleneck": "^2.19.5",
     "bullmq": "^5.58.7",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
@@ -44,6 +49,7 @@
     "dotenv": "^17.2.1",
     "express-basic-auth": "^1.2.1",
     "helmet": "^8.1.0",
+    "ioredis": "^5.8.1",
     "joi": "^18.0.1",
     "nestjs-telegraf": "^2.9.1",
     "passport": "^0.7.0",
