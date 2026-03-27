@@ -227,7 +227,6 @@ export class ContestService {
         ),
       ]);
     this.logger.debug(`Получен конкурс с id=${id} для клиента`);
-    console.log(participations.length);
 
     const { telegramMessageIds, ...otherInfo } = contest[0];
     return {
@@ -303,7 +302,7 @@ export class ContestService {
       if (savedContest.allowedGroups?.length && !dto.startDate) {
         try {
           const telegramMessageIds = await this._telegramPostService.sendPosts(
-            savedContest.allowedGroups.map((g) => g.id.toString()),
+            savedContest.allowedGroups.map((g) => g.telegramId.toString()),
             `${savedContest.name}\n\n${savedContest.description}`,
             savedContest.imageUrl,
             savedContest.id,

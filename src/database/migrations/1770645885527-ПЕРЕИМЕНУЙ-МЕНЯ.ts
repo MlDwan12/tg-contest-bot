@@ -1,6 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class init1759130019493 implements MigrationInterface {
+export class init1770645885527 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
       `CREATE TABLE "contest_winner" ("id" SERIAL NOT NULL, "contestId" integer, "userId" integer, CONSTRAINT "PK_d9f32444cfafdd06d06f57a2788" PRIMARY KEY ("id"))`,
@@ -18,7 +18,7 @@ export class init1759130019493 implements MigrationInterface {
       `CREATE TABLE "contests" ("id" SERIAL NOT NULL, "name" character varying NOT NULL, "description" character varying, "winnerStrategy" "public"."contests_winnerstrategy_enum" NOT NULL DEFAULT 'random', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "status" character varying NOT NULL DEFAULT 'Completed', "startDate" TIMESTAMP NOT NULL, "endDate" TIMESTAMP NOT NULL, "imageUrl" character varying, "buttonText" character varying, "creatorId" integer, "prizePlaces" integer NOT NULL, "telegramMessageIds" text, CONSTRAINT "PK_0b8012f5cf6f444a52179e1227a" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
-      `CREATE TABLE "contest_participations" ("id" SERIAL NOT NULL, "status" character varying NOT NULL DEFAULT 'verified', "groupId" bigint, "prizePlace" integer, "userId" integer, "contestId" integer, CONSTRAINT "contest_participations_user_contest_unique" UNIQUE ("userId", "contestId"), CONSTRAINT "PK_ea26ae8ec96d7c112dd6ec6fa6d" PRIMARY KEY ("id"))`,
+      `CREATE TABLE "contest_participations" ("id" SERIAL NOT NULL, "userId" integer NOT NULL, "contestId" integer NOT NULL, "status" character varying NOT NULL DEFAULT 'verified', "groupId" bigint, "prizePlace" integer, CONSTRAINT "contest_participations_user_contest_unique" UNIQUE ("userId", "contestId"), CONSTRAINT "PK_ea26ae8ec96d7c112dd6ec6fa6d" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
       `CREATE TABLE "users" ("id" SERIAL NOT NULL, "telegramId" character varying NOT NULL, "username" character varying, "firstName" character varying, "lastName" character varying, CONSTRAINT "UQ_df18d17f84763558ac84192c754" UNIQUE ("telegramId"), CONSTRAINT "PK_a3ffb1c0c8416b9fc6f907b7433" PRIMARY KEY ("id"))`,

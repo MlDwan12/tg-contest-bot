@@ -62,6 +62,7 @@ export class ContestParticipationService {
       FROM contest_participations cp
       JOIN users u ON u.id = cp."userId"
       WHERE cp."contestId" = $1 AND cp.status = 'winner'
+      ORDER BY cp."prizePlace" ASC
       `,
         [contest.id],
       );

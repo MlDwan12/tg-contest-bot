@@ -21,6 +21,7 @@ export class ChannelService {
       //   `Попытка создать канал: ${JSON.stringify(createChannelDto)}`,
       // );
 
+      //!!переделать
       const isExistChannel = await this.channelRepository.exists({
         where: { telegramName: createChannelDto.telegramName },
       });
@@ -35,9 +36,9 @@ export class ChannelService {
           HttpStatus.CONFLICT,
         );
       }
-
+      //!!Поменяли апи теперь только по тг id проверить везде переделать
       const chatInfo = await this._telegramService.getChatInfo(
-        createChannelDto.telegramName,
+        createChannelDto.telegramId,
       );
 
       const tempChannel = this.channelRepository.create({
@@ -57,9 +58,10 @@ export class ChannelService {
       }
 
       const chat = await this._telegramService.getChatInfo(
-        createChannelDto.telegramName,
+        createChannelDto.telegramId,
       );
 
+      // if (chat) {
       const channel = this.channelRepository.create({
         telegramId: String(chat.id),
         name: 'title' in chat ? chat.title : (chat.username ?? 'Без названия'),
@@ -71,6 +73,7 @@ export class ChannelService {
       //this.logger.log(`✅ Канал создан: ${saved.telegramId} (${saved.name})`);
 
       return saved;
+      // }
     } catch (error) {
       this.logger.error(
         `Ошибка при создании канала: ${error.message}`,
